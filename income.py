@@ -14,7 +14,6 @@ import os.path
 from time import time
 
 default_currency = 'ILS'
-#pp = pprint.PrettyPrinter(indent=2)
 
 def add_months(sourcedate, months):
     month = sourcedate.month - 1 + months
@@ -61,8 +60,6 @@ def refresh_rates(base_currency, update_currencies=[]):
         yaml.dump(r, open(r_file,'w'), explicit_start=True, explicit_end=True)
     return r[base_currency]
 
-
-    
 
 def next_date(current_date, period, count=1):
     if period in ['daily', 'weekly', 'biweekly']:
@@ -211,7 +208,11 @@ if __name__ == '__main__':
     
     # r = refresh_rates(default_currency)
     b = Balance(yaml.load(open('i.yml')))
-    pprint(b._totals(end=datetime.strptime(sys.argv[1], "%Y-%m-%d")))
+    try:
+        e = datetime.strptime(sys.argv[1], "%Y-%m-%d")
+    except IndexError:
+        e = datetime.now()+timedelta(365,0,0)
+    pprint(b._totals(end=e))
     for l in b.incomes:
         l.fix_id()
         # pprint(l.get_sum(datetime.now(), datetime.strptime(sys.argv[1], "%Y-%m-%d")))
