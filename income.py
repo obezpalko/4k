@@ -9,8 +9,11 @@ from uuid import uuid4
 import yaml
 import csv
 import money
+import http.client
+import os.path
+from time import time
 
-default_currency = 'NIS'
+default_currency = 'ILS'
 #pp = pprint.PrettyPrinter(indent=2)
 
 def add_months(sourcedate, months):
@@ -32,6 +35,34 @@ intervals = {
     'yearly': 12
 }
 
+
+def refresh_rates(base_currency, update_currencies=[]):
+    r_file = 'rates.yml'
+    try:
+        r=yaml.load(open(r_file))
+        force_update = False
+    except FileNotFoundError:
+        r = {base_currency:{}}
+        force_update = True
+    if force_update or time() - os.path.getmtime(r_file) > 86400:
+        c_set = set()
+        for c in update_currencies:
+            c_set.add(c)
+        for c in r[base_currency]:
+            c_set.add(c)
+        conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
+
+        for c in c_set:
+            conn.request("GET", "http://download.finance.yahoo.com/d/quotes.csv?e=.csv&f=sl1d1t1&s={}{}=X".format(
+                    c, base_currency))
+            r1=conn.getresponse()
+            r[base_currency][c] = float(str(r1.read()).split(",")[1])
+        conn.close()
+        yaml.dump(r, open(r_file,'w'), explicit_start=True, explicit_end=True)
+    return r[base_currency]
+
+
+    
 
 def next_date(current_date, period, count=1):
     if period in ['daily', 'weekly', 'biweekly']:
@@ -106,18 +137,24 @@ class Balance(object):
     def __init__(self, incomes=[]):
         object.__init__(self)
         self.incomes = incomes
+        self.current_rates = refresh_rates(default_currency, self._get_currencies())
     def _get_currencies(self):
         c = set()
         for i in self.incomes:
             c.add(i.currency)
         return c
     def _totals(self, start=datetime.now(), end=datetime.now()):
-        t = {}
+        t = {"_{}".format(default_currency): 0}
+        s = 0
         for c in self._get_currencies():
             t[c] = 0
         for i in self.incomes:
             (name, st, bal, curr) = i.get_sum(start, end)
             t[curr] += bal
+            if default_currency == curr:
+                t["_{}".format(default_currency)] += bal
+            else:
+                t["_{}".format(default_currency)] += bal * self.current_rates[curr]
         return t
     
 class Transaction(object):
@@ -171,11 +208,13 @@ class Transactions(object):
 
 if __name__ == '__main__':
     import sys
+    
+    # r = refresh_rates(default_currency)
     b = Balance(yaml.load(open('i.yml')))
     pprint(b._totals(end=datetime.strptime(sys.argv[1], "%Y-%m-%d")))
     for l in b.incomes:
         l.fix_id()
-        pprint(l.get_sum(datetime.now(), datetime.strptime(sys.argv[1], "%Y-%m-%d")))
+        # pprint(l.get_sum(datetime.now(), datetime.strptime(sys.argv[1], "%Y-%m-%d")))
 
     # t = Transactions('t.csv')
     # pprint(t.filter('01addd82-c0b4-49fb-99d7-d972b56e8207'))
