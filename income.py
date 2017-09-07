@@ -7,7 +7,10 @@ from calendar import monthrange
 from pprint import pprint
 from uuid import uuid4
 import yaml
+import csv
+import money
 
+default_currency = 'NIS'
 #pp = pprint.PrettyPrinter(indent=2)
 
 def add_months(sourcedate, months):
@@ -40,7 +43,7 @@ def next_date(current_date, period, count=1):
 class Income(object):
     """ """
 
-    def __init__(self, summ, start_date, end_date=None, period='monthly', id=str(uuid4()), name=None):
+    def __init__(self, summ, start_date, end_date=None, period='monthly', id=str(uuid4()), name=None, currency=default_currency):
         object.__init__(self)
         self.summ = summ
         self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
@@ -49,39 +52,133 @@ class Income(object):
         else:
             self.end_date = end_date
         self.period = period
-        self.id = id
+        if id == '~' or id == null:
+            self.id=str(uuid4())
+        else:
+            self.id = id
+        pprint(self.id)
         self.name = name
+        self.currency = currencey
 
     def __repr__(self):
-        return "from {} sum {} {} till {}".format(
+        return "from {} sum {} {} till {} {}".format(
             self.start_date,
             self.summ,
             self.period,
-            self.end_date
+            self.end_date,
+            self.currency
         )
+    def fix_id(self):
+        if self.id is None:
+            self.id=str(uuid4())
 
-    def get_dates(self, end_date):
+    def get_dates(self, start_date=datetime.now(), end_date=datetime.now()):
         list_dates = []
-        s = self.summ
-        if self.start_date <= end_date:
-            list_dates.append((self.name, self.start_date, s))
-            nd = next_date(self.start_date, self.period)
-            while nd <= end_date and ( self.end_date == None or nd <= self.end_date ) :
+        s = 0
+        _sd = max(start_date, self.start_date)
+        if self.end_date:
+            _ed = min(end_date, self.end_date)
+        else:
+            _ed = end_date
+        if _sd > _ed:
+            return []
+        if _sd == self.start_date:
+           s = self.summ
+           list_dates.append((self.name, _sd, s, self.currency))
+        # pprint ("{} {} {}".format(self.start_date, _sd, _ed))
+        #if _sd < self.start_date:
+        #    list_dates.append((self.name, _sd, s, self.currency))
+        nd = next_date(self.start_date, self.period)
+        while nd <= _ed:
+            if nd >= _sd and nd <= _ed:
                 s += self.summ
-                list_dates.append((self.name, nd, s))
-                nd = next_date(nd, self.period)
+                list_dates.append((self.name, nd, s, self.currency))
+            nd = next_date(nd, self.period)
         return list_dates
     
-    def get_sum(self, end_date):
+    def get_sum(self, start_date=datetime.now(), end_date=datetime.now()):
         try:
-            return self.get_dates(end_date)[-1]
+            return self.get_dates(start_date, end_date)[-1]
         except IndexError:
-            return (self.name, None, 0)
-  
+            return (self.name, None, 0, self.currency)
+
+class Balance(object):
+    def __init__(self, incomes=[]):
+        object.__init__(self)
+        self.incomes = incomes
+    def _get_currencies(self):
+        c = set()
+        for i in self.incomes:
+            c.add(i.currency)
+        return c
+    def _totals(self, start=datetime.now(), end=datetime.now()):
+        t = {}
+        for c in self._get_currencies():
+            t[c] = 0
+        for i in self.incomes:
+            (name, st, bal, curr) = i.get_sum(start, end)
+            t[curr] += bal
+        return t
+    
+class Transaction(object):
+    def __init__(self,id=uuid4(), income_reference=None, income_date=None, income_summ = None, real_date=None, real_summ=None):
+        object.__init__(self)
+        if id == '~':
+            self.id=str(uuid4())
+        else:
+            self.id = id
+        self.income_reference = income_reference
+        self.income_date = income_date
+        self.income_summ = income_summ
+        if real_date:
+            self.real_date = real_date
+        else:
+            self.real_date = self.income_date
+        if real_summ:
+            self.real_summ = real_summ
+        else:
+            self.real_summ = self.income_summ
+    def __repr__(self):
+        return "{};{};{};{};{};{}".format(
+            self.id,
+            self.income_reference,
+            self.income_date,
+            self.income_summ,
+            self.real_date,
+            self.real_summ)
+        
+class Transactions(object):
+    def __init__(self, file_name):
+        object.__init__(self)
+        self.file_name = file_name
+        self.transactions = []
+        self._load()
+    def _load(self):
+        
+        for row in csv.reader(open(self.file_name, 'r'), delimiter=';'):
+            self.transactions.append(Transaction(*row))    
+    def save(self):
+        return True
+    
+    def filter(self, income_ref=None):
+        if income_ref == None:
+            return []
+        r = []
+        for t in self.transactions:
+            if t.income_reference == income_ref:
+                r.append(t)
+        return r
 
 if __name__ == '__main__':
-    list_incomes = yaml.load(open('i.yml'))
-    for l in list_incomes:
-        pprint(l.get_sum(datetime.strptime("2018-01-01", "%Y-%m-%d")))
+    import sys
+    b = Balance(yaml.load(open('i.yml')))
+    pprint(b._totals(end=datetime.strptime(sys.argv[1], "%Y-%m-%d")))
+    for l in b.incomes:
+        l.fix_id()
+        pprint(l.get_sum(datetime.now(), datetime.strptime(sys.argv[1], "%Y-%m-%d")))
 
-    yaml.dump(list_incomes, open('i.yml','w'), explicit_start=True, explicit_end=True)
+    # t = Transactions('t.csv')
+    # pprint(t.filter('01addd82-c0b4-49fb-99d7-d972b56e8207'))
+    yaml.dump(b.incomes, open('i.yml','w'), explicit_start=True, explicit_end=True)
+    # o = list_incomes[0]
+    # pprint(o.get_dates())
