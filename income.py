@@ -24,14 +24,14 @@ def add_months(sourcedate, months):
 
 
 intervals = {
-    'daily': 1,
-    'weekly': 7,
-    'biweekly': 14,
-    'monthly': 1,
-    'bimonthly': 2,
-    'quaterly': 3,
-    'half-year': 6,
-    'yearly': 12
+    'daily': (1, 'd'),
+    'weekly': (7, 'd'),
+    'biweekly': (14, 'd'),
+    'monthly': (1, 'm'),
+    'bimonthly': (2, 'm'),
+    'quaterly': (3, 'm'),
+    'half-year': (6, 'm'),
+    'yearly': (12, 'm')
 }
 
 
@@ -62,10 +62,10 @@ def refresh_rates(base_currency, update_currencies=[]):
 
 
 def next_date(current_date, period, count=1):
-    if period in ['daily', 'weekly', 'biweekly']:
-        return current_date + timedelta(intervals[period] * count)
+    if intervals[period][1] == 'd' :
+        return current_date + timedelta(intervals[period][0] * count)
     else:
-        return add_months(current_date, intervals[period] * count)
+        return add_months(current_date, intervals[period][0] * count)
 
 
 class Income(object):
@@ -96,6 +96,8 @@ class Income(object):
             self.end_date,
             self.currency
         )
+
+        
     def fix_id(self):
         if self.id is None:
             self.id=str(uuid4())
@@ -131,10 +133,20 @@ class Income(object):
             return (self.name, None, 0, self.currency)
 
 class Balance(object):
-    def __init__(self, incomes=[]):
+    def __init__(self, filename=None):
         object.__init__(self)
-        self.incomes = incomes
+        self.filename = filename
+        if self.filename:
+            self.load()
         self.current_rates = refresh_rates(default_currency, self._get_currencies())
+
+    def load(self):
+        self.incomes = yaml.load(open(self.filename, 'r'))
+        for l in self.incomes:
+          l.fix_id()
+    def save(self):
+        yaml.dump(self.incomes, open(self.filename, 'w'), explicit_start=True, explicit_end=True )
+
     def _get_currencies(self):
         c = set()
         for i in self.incomes:
@@ -206,8 +218,7 @@ class Transactions(object):
 if __name__ == '__main__':
     import sys
     
-    # r = refresh_rates(default_currency)
-    b = Balance(yaml.load(open('i.yml')))
+    b = Balance('i.yml')
     try:
         e = datetime.strptime(sys.argv[1], "%Y-%m-%d")
     except IndexError:
@@ -219,6 +230,6 @@ if __name__ == '__main__':
 
     # t = Transactions('t.csv')
     # pprint(t.filter('01addd82-c0b4-49fb-99d7-d972b56e8207'))
-    yaml.dump(b.incomes, open('i.yml','w'), explicit_start=True, explicit_end=True)
+    b.save()
     # o = list_incomes[0]
     # pprint(o.get_dates())

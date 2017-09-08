@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% block body %}
+{{intervals}}
+  <table class=entries>
+  {% for entry in entries %}
+    <tr><td>{{ entry.title|safe }}</td><td>{{ entry.value|safe }}{{ entry.item|safe }}</td></tr>
+  {% else %}
+    <tr><td>Unbelievable.  No entries here so far</td></tr>
+  {% endfor %}
+    </table>
+{% endblock %}
