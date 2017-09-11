@@ -136,6 +136,7 @@ class Balance(object):
     def __init__(self, filename=None):
         object.__init__(self)
         self.filename = filename
+        print(self.filename)
         if self.filename:
             self.load()
         self.current_rates = refresh_rates(default_currency, self._get_currencies())
@@ -215,10 +216,11 @@ class Transactions(object):
                 r.append(t)
         return r
 
+
 if __name__ == '__main__':
     import sys
     
-    b = Balance('i.yml')
+    b = Balance("{}/{}".format(os.path.dirname(sys.argv[0]),'i.yml'))
     try:
         e = datetime.strptime(sys.argv[1], "%Y-%m-%d")
     except IndexError:

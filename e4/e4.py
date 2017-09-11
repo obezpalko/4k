@@ -3,6 +3,7 @@ import os
 import sqlite3
 from flask import Flask, request, session, g, redirect, url_for, abort, \
      render_template, flash
+import http.client
 
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
@@ -37,23 +38,17 @@ def init_db():
         db.cursor().executescript(f.read())
     db.commit()
     
-def load_intervals():
+def load_intervals1():
     """ load intervals from database """
     db = get_db()
     cur = db.execute('select id, title, item, value from intervals order by id desc')
     entries = cur.fetchall()
-    for c in entries:
-        intervals[c['title']] = (c['value'], c['item'])
-    return intervals
+    return entries
 
-@app.route('/i')
-def load_intervals():
-    """ load intervals from database """
-    db = get_db()
-    cur = db.execute('select id, title, item, value from intervals order by id desc')
-    entries = cur.fetchall()
-    return render_template('show_intervals.html', entries=entries)
-
+@app.cli.command('show_intervals1')
+def show_intervals1():
+    for r in load_intervals1():
+        print(r['id'])
 
 @app.teardown_appcontext
 def close_db(error):
@@ -67,23 +62,120 @@ def initdb_command():
     init_db()
     print('Initialized the database.')
 
-@app.route('/')
-def show_entries():
+@app.cli.command('rates')
+def update_rates():
     db = get_db()
-    cur = db.execute('select id, title from intervals order by id desc')
+    cur = db.execute('select currency_id, currency_index, is_default from currency where is_default == 1 limit 1')
+    default_currency = cur.fetchall()[0]
+    print("default currency: {}".format(default_currency['currency_index']))
+    cur = db.execute('select currency_id, currency_index, is_default from currency')
+    conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
+
+    for currency in cur.fetchall():
+        conn.request("GET", "http://download.finance.yahoo.com/d/quotes.csv?e=.csv&f=sl1d1t1&s={}{}=X".format(
+                    currency['currency_index'], default_currency['currency_index']))
+        r1=conn.getresponse()
+        rate = float(str(r1.read()).split(",")[1])
+        cur = db.execute('insert into rates values(date("now"), ?, ?, ?)', (default_currency['currency_id'], currency['currency_id'], rate))
+        print("cur.lastrowid {}".format(cur.lastrowid))
+        print("currency {} rate: {}".format(currency['currency_index'], rate))
+    db.commit()
+    db.close()
+
+
+@app.route('/')
+def show_default():
+    db = get_db()
+    cur = db.execute('select id, title from incomes order by id desc')
     entries = cur.fetchall()
     return render_template('show_entries.html', entries=entries)
 
-@app.route('/add', methods=['POST'])
+@app.route('/incomes')
+def show_incomes():
+    db = get_db()
+    cur = db.execute('''
+    select
+        incomes.id as id,
+        incomes.title as title,
+        incomes.sum as sum,
+        currency.currency_index as currency,
+        currency.currency_id as currency_id,
+        intervals.title as period,
+        intervals.id as interval,
+        incomes.start_date as start,
+        incomes.end_date as end
+    from
+        incomes,
+        currency,
+        intervals
+    where
+        currency.currency_id = incomes.currency
+        and
+        intervals.id = incomes.period
+    order by id desc
+    ''')
+    entries = cur.fetchall()
+    return render_template('show_entries.html',
+        entries=entries,
+        currencies=get_currencies(),
+        periods=load_intervals1())
+    
+
+@app.route('/intervals')
+def load_intervals():
+    """ load intervals from database """
+    db = get_db()
+    cur = db.execute('select id, title, item, value from intervals order by id desc')
+    entries = cur.fetchall()
+    return render_template('show_intervals.html', entries=entries)
+
+def get_currencies():
+    db = get_db()
+    cur = db.execute("""
+    select 
+        distinct currency.currency_id,
+        currency.currency_index,
+        rates.rate,
+        max(rates.rate_date) as rate_date,
+        currency.is_default
+    from currency, rates
+    where rates.currency_b = currency.currency_id 
+    group by currency.currency_index
+    order by currency.currency_index
+    """)
+    entries = cur.fetchall()
+    return entries   
+
+@app.route('/c')
+def show_currencies():
+    return render_template('show_currencies.html', entries=get_currencies())
+
+
+@app.route('/income/modify', methods=['POST'])
 def add_entry():
+    
     if not session.get('logged_in'):
         abort(401)
     db = get_db()
-    db.execute('insert into intervals (title, item, value) values (?, ?, ?)',
-                 [request.form['title'], request.form['item'], request.form['value']])
+    parameters = [request.form['title'], 
+                int(request.form['currency']),
+                float(request.form['sum']),
+                request.form['start_date'],
+                request.form['end_date'],
+                int(request.form['period'])
+                ]
+    if request.form['submit'] == 'Insert':
+        cmd = 'insert into incomes (title, currency, sum, start_date, end_date, period) values (?, ?, ?, ?, ?, ?)'
+    else:
+        cmd = "update incomes set title = ?, currency = ?, sum = ?, start_date = ?, end_date = ?, period = ? where id = ?"
+        parameters.append(int(request.form['hidden_id']))
+    # open('/tmp/debug','w').write("{}".format(request.form))
+    db.execute( cmd, parameters)
     db.commit()
     flash('New entry was successfully posted')
-    return redirect(url_for('show_entries'))
+    return redirect(url_for('show_incomes'))
+
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -96,7 +188,7 @@ def login():
         else:
             session['logged_in'] = True
             flash('You were logged in')
-            return redirect(url_for('show_entries'))
+            return redirect(url_for('show_incomes'))
     return render_template('login.html', error=error)
 
 @app.route('/logout')

@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block body %}
+{{intervals}}
+  <table class=entries>
+  {% for entry in entries %}
+    <tr {% if entry.is_default %}style="background-color:green"{% endif %}>
+        <td>{{ entry.currency_id|safe }}</td>
+        
+      <td>{{ entry.currency_index|safe }}</td>
+      <td>{{ entry.rate|safe }}</td>
+      <td>{{ entry.rate_date|safe }}</td>
+    </tr>
+  {% else %}
+    <tr><td>Unbelievable.  No entries here so far</td></tr>
+  {% endfor %}
+    </table>
+{% endblock %}
