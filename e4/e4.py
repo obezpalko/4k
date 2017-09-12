@@ -4,6 +4,7 @@ import sqlite3
 from flask import Flask, request, session, g, redirect, url_for, abort, \
      render_template, flash
 import http.client
+import json
 
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
@@ -17,11 +18,18 @@ app.config.update(dict(
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
 def connect_db():
     """Connects to the specific database."""
     rv = sqlite3.connect(app.config['DATABASE'])
     rv.execute("PRAGMA foreign_keys = 1")
-    rv.row_factory = sqlite3.Row
+    #rv.row_factory = sqlite3.Row
+    rv.row_factory = dict_factory
     return rv
 
 def get_db():
@@ -63,6 +71,7 @@ def initdb_command():
     print('Initialized the database.')
 
 @app.cli.command('rates')
+@app.route('/update_rates')
 def update_rates():
     db = get_db()
     cur = db.execute('select currency_id, currency_index, is_default from currency where is_default == 1 limit 1')
@@ -80,8 +89,13 @@ def update_rates():
         print("cur.lastrowid {}".format(cur.lastrowid))
         print("currency {} rate: {}".format(currency['currency_index'], rate))
     db.commit()
-    db.close()
-
+    # db.close()
+    try:
+        if request.method == 'GET':
+            return json.dumps(get_currencies([]))
+        return True
+    except RuntimeError:
+        return True
 
 @app.route('/')
 def show_default():
@@ -129,7 +143,7 @@ def load_intervals():
     entries = cur.fetchall()
     return render_template('show_intervals.html', entries=entries)
 
-def get_currencies():
+def get_currencies(currency_ids=[]):
     db = get_db()
     cur = db.execute("""
     select 
@@ -140,11 +154,17 @@ def get_currencies():
         currency.is_default
     from currency, rates
     where rates.currency_b = currency.currency_id 
+    {}
     group by currency.currency_index
     order by currency.currency_index
-    """)
+    """.format(
+        "and currency.currency_id in ({})".format(
+            ','.join(map(str, currency_ids))) if len(currency_ids)>0 else ""))
     entries = cur.fetchall()
-    return entries   
+    dat = {}
+    for d in entries:
+        dat[int(d['currency_id'])] = d
+    return dat
 
 @app.route('/c')
 def show_currencies():
@@ -196,3 +216,15 @@ def logout():
     session.pop('logged_in', None)
     flash('You were logged out')
     return redirect(url_for('show_entries'))
+
+def currency_GET(param):
+    return get_currencies(param)
+
+@app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
+@app.route('/api/<path:api>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
+def dispatcher(api):
+    # result = "{}".format(globals()["{}_{}".format(api, request.method)]())
+    result = globals()["{}_{}".format(api, request.method)]([])
+    
+    return json.dumps(result)
+

@@ -16,3 +16,7 @@ h2              { font-size: 1.2em; }
 .flash          { background: #cee5F5; padding: 0.5em;
                   border: 1px solid #aacbe2; }
 .error          { background: #f0d6d6; padding: 0.5em; }
+#currencies     { display: block; width: 50%; float: right; 
+                  list-style-type: none; padding: 0; 
+                  margin: 0; background-color:  #FFFFFF; font-size: 75%; text-align: right; }
+#currencies li  { display: inline; padding-left: 0.3em; padding-right: 0.3em; }
