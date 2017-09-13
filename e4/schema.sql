@@ -1,6 +1,7 @@
+PRAGMA foreign_keys = OFF;
 drop table if exists intervals;
 create table intervals (
-  id integer primary key autoincrement,
+  id integer primary key,
   title text not null,
   item char default 'd',
   value integer not null default 1
@@ -14,27 +15,26 @@ insert into intervals values(6, 'quaterly', 'm', 3);
 insert into intervals values(7, 'half-year', 'm', 6);
 insert into intervals values(8, 'yearly', 'm', 12);
 
-drop table if exists rates;
 
 drop table if exists currency;
 create table currency (
-  currency_id integer primary key autoincrement,
-  currency_index text primery key,
-  currency_name text,
-  is_default numeric default 0
+  id integer primary key,
+  "index" text not null,
+  name text,
+  "default" numeric default 0
 );
-insert into currency (currency_index, is_default) values ('ILS', 1);
-insert into currency (currency_index) values ('UAH');
-insert into currency (currency_index) values ('USD');
-insert into currency (currency_index) values ('EUR');
-insert into currency (currency_index) values ('GBP');
+insert into currency ("index", "default") values ('ILS', 1);
+insert into currency ("index") values ('UAH');
+insert into currency ("index") values ('USD');
+insert into currency ("index") values ('EUR');
+insert into currency ("index") values ('GBP');
 
 
-drop table if exists incomes;
+-- drop table if exists incomes;
 create table incomes (
-  id integer primary key autoincrement,
+  id integer primary key,
   title text not null,
-  currency REFERENCES currency(currency_id) not null,
+  currency REFERENCES currency(id) not null,
   sum real not null default 0.0,
   start_date numeric not null,
   end_date numeric,
@@ -42,11 +42,11 @@ create table incomes (
   FOREIGN KEY(period) REFERENCES intervals(id)
 );
 
-
+-- drop table if exists rates;
 create table rates (
 rate_date numeric not null ,
-currency_a references currency(currency_id),
-currency_b references currency(currency_id),
+currency_a references currency(id),
+currency_b references currency(id),
 rate real not null
 );
 

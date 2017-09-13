@@ -1,20 +1,37 @@
 {% extends "layout.html" %}
 {% block js %}
 <script src="{{url_for('static', filename='up.js')}}"></script>
+
+<script>
+$( document ).ready(function() { 
+  $.getJSON('/api/currency', function(data){
+    var options = [];
+    $.each(data, function(key, val){
+      options.push(
+        "<option value='" +
+        key + "'" + ((val['default'] == 1) ? " selected>" : ">") + val['index'] + "</option>");
+    });
+  $("#currency_id").html(options.join(''));
+  });
+  
+});
+  
+</script>
+
 {% endblock %}
 {% block body %}
   {% if session.logged_in %}
     <form action="{{ url_for('add_entry') }}" method=post class=add-entry>
       <dl>
-        <dt>Id:
-        <dd><input type=text name=hidden_id id=hidden_id value=new >
+        <dd>Id:
+        <dd><input type=text name=hidden_id id=hidden_id value=new size=4>
         <dt>Title:
         <dd><input type=text size=30 name=title id=title>
         <dt>Currency:
-        <dd><select name=currency id=currency>
-        {% for c in currencies %}
-        <option value="{{ c.currency_id }}"{% if c.is_default ==1 %} selected{% endif %}>{{ c.currency_index }}</option>
-        {% endfor %}
+        <dd><select name=currency id=currency_id>
+          {% for c in currencies %}
+          <option value="{{ c.currency_id }}"{% if c.default ==1 %} selected{% endif %}>{{ c.index }}</option>
+          {% endfor %}          
         </select>
         <dt>Summ:
         <dd><input name=sum size=11 id=sum>
@@ -38,7 +55,7 @@
       <dd style="display:inline" >
       <span id=sum_{{entry.id}}>{{ entry.sum|safe }}</span>
       {{ entry.currency }}
-       <span style="display:none" id=currency_{{entry.id}}>{{ entry.currency_id }}</span>
+       <span style="display:none" id=currency_id_{{entry.id}}>{{ entry.currency_id }}</span>
       {{ entry.period }}
       <span style="display:none" id=period_{{entry.id}}>{{ entry.interval }}</span>
       from <span id=start_{{entry.id}}>{{ entry.start }}</span>{% if entry.end %} till <span id=end_{{entry.id}}>{{ entry.end }}</span>{% endif %}

@@ -5,6 +5,7 @@ from flask import Flask, request, session, g, redirect, url_for, abort, \
      render_template, flash
 import http.client
 import json
+import csv
 
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
@@ -23,6 +24,12 @@ def dict_factory(cursor, row):
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
     return d
+
+def to_dict(a=[], id_="id"):
+    result = {}
+    for row in a:
+        result[row[id_]] = row
+    return result
 
 def connect_db():
     """Connects to the specific database."""
@@ -74,46 +81,60 @@ def initdb_command():
 @app.route('/update_rates')
 def update_rates():
     db = get_db()
-    cur = db.execute('select currency_id, currency_index, is_default from currency where is_default == 1 limit 1')
+    cur = db.execute('select id, "index", "default" from currency where "default" == 1 limit 1')
     default_currency = cur.fetchall()[0]
-    print("default currency: {}".format(default_currency['currency_index']))
-    cur = db.execute('select currency_id, currency_index, is_default from currency')
+    cur = db.execute('select id, "index", "default" from currency')
     conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
-
+    param = []
+    c_index = {}
     for currency in cur.fetchall():
-        conn.request("GET", "http://download.finance.yahoo.com/d/quotes.csv?e=.csv&f=sl1d1t1&s={}{}=X".format(
-                    currency['currency_index'], default_currency['currency_index']))
-        r1=conn.getresponse()
-        rate = float(str(r1.read()).split(",")[1])
-        cur = db.execute('insert into rates values(date("now"), ?, ?, ?)', (default_currency['currency_id'], currency['currency_id'], rate))
-        print("cur.lastrowid {}".format(cur.lastrowid))
-        print("currency {} rate: {}".format(currency['currency_index'], rate))
+        param.append("{}{}=X".format(currency['index'], default_currency['index']))
+        c_index[currency['index']] = currency['id']
+    cmd = "http://download.finance.yahoo.com/d/quotes.csv?f=sl1d1&s={}".format(','.join(param))
+    conn.request("GET", cmd)
+    param = []
+    
+    for row in csv.reader(conn.getresponse().read().decode("utf-8", "strict").split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
+        if len(row) < 1: continue
+        param.append(
+            (
+                default_currency['id'],
+                c_index[row[0].replace('{}=X'.format(default_currency['index']), '')],
+                float(row[1])
+            )
+        )
+    cur = db.executemany(
+        'insert into rates ("rate_date", "currency_a", "currency_b", "rate") values (datetime("now"), ?, ?, ?)',
+        param
+        )
     db.commit()
-    # db.close()
     try:
         if request.method == 'GET':
-            return json.dumps(get_currencies([]))
+            return json.dumps(to_dict(get_currencies([])))
         return True
     except RuntimeError:
         return True
 
-@app.route('/')
-def show_default():
-    db = get_db()
-    cur = db.execute('select id, title from incomes order by id desc')
-    entries = cur.fetchall()
-    return render_template('show_entries.html', entries=entries)
 
+@app.route('/')
 @app.route('/incomes')
+@app.route('/income')
+
 def show_incomes():
+    return render_template('show_entries.html',
+        entries=get_incomes(),
+        currencies=get_currencies(),
+        periods=load_intervals1())
+    
+def get_incomes(*args, **kwargs):
     db = get_db()
     cur = db.execute('''
     select
         incomes.id as id,
         incomes.title as title,
         incomes.sum as sum,
-        currency.currency_index as currency,
-        currency.currency_id as currency_id,
+        currency."index" as currency,
+        currency.id as currency_id,
         intervals.title as period,
         intervals.id as interval,
         incomes.start_date as start,
@@ -123,16 +144,14 @@ def show_incomes():
         currency,
         intervals
     where
-        currency.currency_id = incomes.currency
+        currency.id = incomes.currency
         and
         intervals.id = incomes.period
     order by id desc
     ''')
     entries = cur.fetchall()
-    return render_template('show_entries.html',
-        entries=entries,
-        currencies=get_currencies(),
-        periods=load_intervals1())
+    return entries
+    
     
 
 @app.route('/intervals')
@@ -147,28 +166,21 @@ def get_currencies(currency_ids=[]):
     db = get_db()
     cur = db.execute("""
     select 
-        distinct currency.currency_id,
-        currency.currency_index,
+        distinct currency.id,
+        currency."index",
         rates.rate,
         max(rates.rate_date) as rate_date,
-        currency.is_default
+        currency."default"
     from currency, rates
-    where rates.currency_b = currency.currency_id 
+    where rates.currency_b = currency.id 
     {}
-    group by currency.currency_index
-    order by currency.currency_index
+    group by currency."index"
+    order by currency."index"
     """.format(
-        "and currency.currency_id in ({})".format(
+        "and currency.id in ({})".format(
             ','.join(map(str, currency_ids))) if len(currency_ids)>0 else ""))
     entries = cur.fetchall()
-    dat = {}
-    for d in entries:
-        dat[int(d['currency_id'])] = d
-    return dat
-
-@app.route('/c')
-def show_currencies():
-    return render_template('show_currencies.html', entries=get_currencies())
+    return entries
 
 
 @app.route('/income/modify', methods=['POST'])
@@ -220,11 +232,11 @@ def logout():
 def currency_GET(param):
     return get_currencies(param)
 
+def income_GET(*args, **kwargs):
+    return get_incomes(*args, **kwargs)
+
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<path:api>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
 def dispatcher(api):
-    # result = "{}".format(globals()["{}_{}".format(api, request.method)]())
-    result = globals()["{}_{}".format(api, request.method)]([])
-    
-    return json.dumps(result)
+    return json.dumps(to_dict(globals()["{}_{}".format(api, request.method)]([])))
 

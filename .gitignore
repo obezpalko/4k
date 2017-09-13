@@ -101,4 +101,4 @@ ENV/
 .mypy_cache/
 *.yml
 *.csv
-e4/e4.db
+e4/*.db
