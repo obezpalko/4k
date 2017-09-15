@@ -19,7 +19,6 @@ $( document ).ready(function() {
 </script>
 
 {% endblock %}
-<body>
 {% block body %}
   {% if session.logged_in %}
     <form action="{{ url_for('add_entry') }}" method=post class=add-entry id="income">
@@ -88,4 +87,3 @@ $( document ).ready(function() {
   {% endfor %}
       </table>
 {% endblock %}
-</body>

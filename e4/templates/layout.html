@@ -13,7 +13,9 @@ $( document ).ready(function() { c_update('/api/currency') });
 </script>
 {% block js %}
 {% endblock %}
+<body>
 <ul id="currencies"></ul>
+<div id="balance" >balance here</div>
 <div class=page>
   <h1>E4</h1>
   <div class=metanav>
@@ -28,3 +30,4 @@ $( document ).ready(function() { c_update('/api/currency') });
   {% endfor %}
   {% block body %}{% endblock %}
 </div>
+</body>

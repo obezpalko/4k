@@ -21,3 +21,12 @@ h2              { font-size: 1.2em; }
                   list-style-type: none; padding: 0; 
                   margin: 0; padding-right: 3em; background-color:  #FFFFFF; font-size: 75%; text-align: right; }
 #currencies li  { display: inline; padding-left: 0.3em; padding-right: 0.3em; }
+#balance        {
+  width: 25%;
+  border-width: 2px;
+  border-style: solid;
+  border-color: green;
+  float: left;
+  background-color:  #FFFFFF;
+  margin-left: 3em;
+}
