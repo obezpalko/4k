@@ -6,6 +6,8 @@ from flask import Flask, request, session, g, redirect, url_for, abort, \
 import http.client
 import json
 import csv
+from .utils import *
+import datetime
 
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
@@ -15,21 +17,12 @@ app.config.update(dict(
     DATABASE=os.path.join(app.root_path, 'e4.db'),
     SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
     USERNAME='admin',
-    PASSWORD='NieniarcEgHiacHeulijkikej'
+    PASSWORD='NieniarcEgHiacHeulijkikej',
+    HORIZON='12m'
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
 
-def dict_factory(cursor, row):
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
 
-def to_dict(a=[], id_="id"):
-    result = {}
-    for row in a:
-        result[row[id_]] = row
-    return result
 
 def connect_db():
     """Connects to the specific database."""
@@ -53,17 +46,7 @@ def init_db():
         db.cursor().executescript(f.read())
     db.commit()
     
-def load_intervals1():
-    """ load intervals from database """
-    db = get_db()
-    cur = db.execute('select id, title, item, value from intervals order by id desc')
-    entries = cur.fetchall()
-    return entries
 
-@app.cli.command('show_intervals1')
-def show_intervals1():
-    for r in load_intervals1():
-        print(r['id'])
 
 @app.teardown_appcontext
 def close_db(error):
@@ -110,7 +93,7 @@ def update_rates():
     db.commit()
     try:
         if request.method == 'GET':
-            return json.dumps(to_dict(get_currencies([])))
+            return redirect(url_for('dispatcher', api='currency'))
         return True
     except RuntimeError:
         return True
@@ -119,68 +102,11 @@ def update_rates():
 @app.route('/')
 @app.route('/incomes')
 @app.route('/income')
-
 def show_incomes():
     return render_template('show_entries.html',
-        entries=get_incomes(),
-        currencies=get_currencies(),
-        periods=load_intervals1())
-    
-def get_incomes(*args, **kwargs):
-    db = get_db()
-    cur = db.execute('''
-    select
-        incomes.id as id,
-        incomes.title as title,
-        incomes.sum as sum,
-        currency."index" as currency,
-        currency.id as currency_id,
-        intervals.title as period,
-        intervals.id as interval,
-        incomes.start_date as start,
-        incomes.end_date as end
-    from
-        incomes,
-        currency,
-        intervals
-    where
-        currency.id = incomes.currency
-        and
-        intervals.id = incomes.period
-    order by id desc
-    ''')
-    entries = cur.fetchall()
-    return entries
-    
-    
-
-@app.route('/intervals')
-def load_intervals():
-    """ load intervals from database """
-    db = get_db()
-    cur = db.execute('select id, title, item, value from intervals order by id desc')
-    entries = cur.fetchall()
-    return render_template('show_intervals.html', entries=entries)
-
-def get_currencies(currency_ids=[]):
-    db = get_db()
-    cur = db.execute("""
-    select 
-        distinct currency.id,
-        currency."index",
-        rates.rate,
-        max(rates.rate_date) as rate_date,
-        currency."default"
-    from currency, rates
-    where rates.currency_b = currency.id 
-    {}
-    group by currency."index"
-    order by currency."index"
-    """.format(
-        "and currency.id in ({})".format(
-            ','.join(map(str, currency_ids))) if len(currency_ids)>0 else ""))
-    entries = cur.fetchall()
-    return entries
+        entries=income_GET(),
+        currencies=currency_GET(),
+        periods=intervals_GET())
 
 
 @app.route('/income/modify', methods=['POST'])
@@ -229,14 +155,86 @@ def logout():
     flash('You were logged out')
     return redirect(url_for('show_entries'))
 
-def currency_GET(param):
-    return get_currencies(param)
+    
+def currency_GET(*args, **kwargs):
+    db = get_db()
+    currency_ids = []
+    if 'currency_ids' in kwargs:
+        currency_ids = kwargs['currency_ids']
+    cur = db.execute("""
+    select 
+        distinct currency.id,
+        currency."index",
+        rates.rate,
+        max(rates.rate_date) as rate_date,
+        currency."default"
+    from currency, rates
+    where rates.currency_b = currency.id 
+    {}
+    group by currency."index"
+    order by currency."index"
+    """.format(
+        "and currency.id in ({})".format(
+            ','.join(map(str, currency_ids))) if len(currency_ids)>0 else ""))
+    entries = cur.fetchall()
+    return entries
 
 def income_GET(*args, **kwargs):
-    return get_incomes(*args, **kwargs)
+    db = get_db()
+    cur = db.execute('''
+    select
+        incomes.id as id,
+        incomes.title as title,
+        incomes.sum as sum,
+        currency."index" as currency,
+        currency.id as currency_id,
+        intervals.title as period,
+        intervals.id as interval,
+        incomes.start_date as start,
+        incomes.end_date as end
+    from
+        incomes,
+        currency,
+        intervals
+    where
+        currency.id = incomes.currency
+        and
+        intervals.id = incomes.period
+    order by id desc
+    ''')
+    entries = cur.fetchall()
+    return entries
+    
+incomes_GET = income_GET
+
+def intervals_GET(*args, **kwargs):
+    """ load intervals from database """
+    db = get_db()
+    cur = db.execute('select id, title, item, value from intervals order by id desc')
+    entries = cur.fetchall()
+    return entries
+
+def plan_GET(*args, **kwargs):
+    if 'start' in kwargs:
+        start_date = kwargs['start']
+    else:
+        start_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    if 'horizon' in kwargs:
+        horizon = kwargs['horizon']
+    else:
+        horizon = app.config['HORIZON']
+    return { 'plan':
+                { 
+                    "start": start_date,
+                    "horizon": horizon,
+                    "intervals": intervals_GET(),
+                    "currencies": currency_GET(),
+                    "incomes": income_GET()
+                }
+            }
+
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<path:api>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
 def dispatcher(api):
     return json.dumps(to_dict(globals()["{}_{}".format(api, request.method)]([])))
-

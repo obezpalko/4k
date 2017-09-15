@@ -14,7 +14,7 @@ insert into intervals values(5, 'bimonthly', 'm', 2);
 insert into intervals values(6, 'quaterly', 'm', 3);
 insert into intervals values(7, 'half-year', 'm', 6);
 insert into intervals values(8, 'yearly', 'm', 12);
-
+insert into intervals values(9, 'onetime', 'd', 0);
 
 drop table if exists currency;
 create table currency (
@@ -44,7 +44,7 @@ create table incomes (
 
 -- drop table if exists rates;
 create table rates (
-rate_date numeric not null ,
+rate_date numeric not null,
 currency_a references currency(id),
 currency_b references currency(id),
 rate real not null

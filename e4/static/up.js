@@ -1,9 +1,10 @@
-function update_income(id) {
+function update_income(event) {
+  var id;
+  id = $($(event.target).parents('tr').find('.income_id')[0]).text();
+  
   $("#hidden_id").val(id);
   var a = ['title', 'sum', 'currency_id', 'start', 'end', 'period'];
-  var b = null;
   $.each(a, function(element){
-    console.log(a[element]+" "+$("#" + a[element] + "_" + id).text());
     $(("#" + a[element])).val($(("#" + a[element] + "_" + id)).text());
   });
   $("#submit").val('Update');

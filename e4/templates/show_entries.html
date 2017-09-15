@@ -19,50 +19,73 @@ $( document ).ready(function() {
 </script>
 
 {% endblock %}
+<body>
 {% block body %}
   {% if session.logged_in %}
-    <form action="{{ url_for('add_entry') }}" method=post class=add-entry>
-      <dl>
-        <dd>Id:
-        <dd><input type=text name=hidden_id id=hidden_id value=new size=4>
-        <dt>Title:
-        <dd><input type=text size=30 name=title id=title>
-        <dt>Currency:
-        <dd><select name=currency id=currency_id>
-          {% for c in currencies %}
-          <option value="{{ c.currency_id }}"{% if c.default ==1 %} selected{% endif %}>{{ c.index }}</option>
-          {% endfor %}          
-        </select>
-        <dt>Summ:
-        <dd><input name=sum size=11 id=sum>
-        <dt>Dates:
-        <dd><input name=start_date size=11 id=start> <input name=end_date size=11 id=end> 
-        <dd>Period:
-        <dd><select name=period id=period>
-        {% for p in periods %}
-        <option value="{{ p.id }}">{{ p.title }}</option>
-        {% endfor %}
-        </select>
-        <dd><input type=submit id=submit name=submit value=Insert>
-      </dl>
+    <form action="{{ url_for('add_entry') }}" method=post class=add-entry id="income">
+      <table style="font-size:66%; width:50%;">
+        <caption>edit income</caption>
+        <tr>
+          <th style="display:none;">ID</th>
+          <th>Title</th>
+          <th>Currency</th>
+          <th>Summ</th>
+          <th>Dates</th>
+          <th>Period</th>
+          <th>&nbsp;</th>
+        </tr>
+        <tr>
+          <td  style="display:none;"><input type=text name=hidden_id id=hidden_id value=new size=4></td>
+          <td><input type=text size=30 name=title id=title></td>
+          <td>
+            <select name=currency id=currency_id>
+            {% for c in currencies %}
+              <option value="{{ c.currency_id }}"{% if c.default ==1 %} selected{% endif %}>{{ c.index }}</option>
+            {% endfor %}          
+            </select>
+          </td>
+          <td><input name=sum size=11 id=sum></td>
+          <td><input name=start_date size=11 id=start> <input name=end_date size=11 id=end></td>
+          <td>
+            <select name=period id=period>
+              {% for p in periods %}
+              <option value="{{ p.id }}">{{ p.title }}</option>
+              {% endfor %}
+            </select>
+           </td>
+          <td><input type=submit id=submit name=submit value=Insert></td>
+        </tr>
+      </table>
     </form>
   {% endif %}
-  <dl class=entries>
+  <table class=entries style="font-size:66%; width:45%;" id=incomes_table>
+    <caption>Incomes</caption>
   {% for entry in entries %}
-  
-    <dt id="entry_{{entry.id}}" >
+  <tr>
+    <td>
+      <span style="display:none" class="income_id">{{entry.id}}</span>
       <span style="font-size:125%; color: green;" id=title_{{entry.id}}>{{ entry.title|safe }}</span>
-      <dd style="display:inline" >
-      <span id=sum_{{entry.id}}>{{ entry.sum|safe }}</span>
+    </td>
+    <td style="text-align: right;" id=sum_{{entry.id}}>
+      {{ entry.sum|safe }}
+    </td>
+    <td>
       {{ entry.currency }}
        <span style="display:none" id=currency_id_{{entry.id}}>{{ entry.currency_id }}</span>
+    </td>
+    <td>  
       {{ entry.period }}
       <span style="display:none" id=period_{{entry.id}}>{{ entry.interval }}</span>
       from <span id=start_{{entry.id}}>{{ entry.start }}</span>{% if entry.end %} till <span id=end_{{entry.id}}>{{ entry.end }}</span>{% endif %}
-<a href=# onclick="update_income({{ entry.id }})">edit</a>
+    </td>
+    <td>
+      <a href=# onclick="update_income(event)">edit</a>
+    </td>
       {% else %}
-    <dt>
-      <dd><em>Unbelievable.  No entries here so far</em>
+    <tr>
+      <td><em>Unbelievable.  No entries here so far</em></td>
+    </tr>
   {% endfor %}
-  </dl>
+      </table>
 {% endblock %}
+</body>
