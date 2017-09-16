@@ -59,6 +59,13 @@ $( document ).ready(function() {
   {% endif %}
   <table class=entries style="font-size:66%; width:45%;" id=incomes_table>
     <caption>Incomes</caption>
+    <tr>
+      <td colspan=4>
+        
+      </td>
+      <td>
+        <a href=# onclick="update_income(event)"><img width='10' height='10' src='/static/iconmonstr-edit-8.svg'/></a>
+      </td>
   {% for entry in entries %}
   <tr>
     <td>
@@ -78,7 +85,7 @@ $( document ).ready(function() {
       from <span id=start_{{entry.id}}>{{ entry.start }}</span>{% if entry.end %} till <span id=end_{{entry.id}}>{{ entry.end }}</span>{% endif %}
     </td>
     <td>
-      <a href=# onclick="update_income(event)">edit</a>
+      <a href=# onclick="update_income(event)"><img width='10' height='10' src='/static/iconmonstr-edit-5.svg'/></a>&nbsp;<a href=# onclick="delete_income(event)"><img width='10' height='10' src='/static/iconmonstr-x-mark-7.svg'/></a>
     </td>
       {% else %}
     <tr>

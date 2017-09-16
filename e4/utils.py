@@ -1,3 +1,7 @@
+#
+from datetime import datetime, date, time, timedelta
+from calendar import monthrange
+
 def dict_factory(cursor, row):
   d = {}
   for idx, col in enumerate(cursor.description):
@@ -18,3 +22,11 @@ def add_months(sourcedate, months):
   month = month % 12 + 1
   day = min(sourcedate.day, monthrange(year, month)[1])
   return sourcedate.replace(year, month, day)
+
+def next_date(current_date, period=(1, 'm'), count=1):
+  if period[0] == 0: return None
+  
+  if period[1] == 'd': return current_date + timedelta(period[0] * count)
+  return add_months(current_date, period[0] * count)
+
+

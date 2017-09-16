@@ -3,11 +3,17 @@ import os
 import sqlite3
 from flask import Flask, request, session, g, redirect, url_for, abort, \
      render_template, flash
+# from flask_sqlalchemy import SQLAlchemy
 import http.client
 import json
 import csv
 from .utils import *
+from .income import DB, Currency, Rate, Income, Interval
 import datetime
+
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, func
+
 
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
@@ -18,35 +24,20 @@ app.config.update(dict(
     SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
     USERNAME='admin',
     PASSWORD='NieniarcEgHiacHeulijkikej',
-    HORIZON='12m'
+    HORIZON='12m',
+    SQLALCHEMY_DATABASE_URI='sqlite:///e4.db'
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
 
+def json_serial(obj):
+  """JSON serializer for objects not serializable by default json code"""
 
-
-def connect_db():
-    """Connects to the specific database."""
-    rv = sqlite3.connect(app.config['DATABASE'])
-    rv.execute("PRAGMA foreign_keys = 1")
-    #rv.row_factory = sqlite3.Row
-    rv.row_factory = dict_factory
-    return rv
-
-def get_db():
-    """Opens a new database connection if there is none yet for the
-    current application context.
-    """
-    if not hasattr(g, 'sqlite_db'):
-        g.sqlite_db = connect_db()
-    return g.sqlite_db
-
-def init_db():
-    db = get_db()
-    with app.open_resource('schema.sql', mode='r') as f:
-        db.cursor().executescript(f.read())
-    db.commit()
-    
-
+  if isinstance(obj, (datetime.datetime, datetime.date)):
+    return obj.isoformat()
+  #if obj.__class__.__name__ in  ['Currency']:
+  if isinstance(obj, (Currency, Income, Rate, Interval)):
+    return obj.to_dict()
+  raise TypeError ("Type %s not serializable" % type(obj))
 
 @app.teardown_appcontext
 def close_db(error):
@@ -63,34 +54,29 @@ def initdb_command():
 @app.cli.command('rates')
 @app.route('/update_rates')
 def update_rates():
-    db = get_db()
-    cur = db.execute('select id, "index", "default" from currency where "default" == 1 limit 1')
-    default_currency = cur.fetchall()[0]
-    cur = db.execute('select id, "index", "default" from currency')
+    # db = get_db()    
+    default_currency = DB.query(Currency).filter_by(default=1).first()
     conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
     param = []
     c_index = {}
-    for currency in cur.fetchall():
-        param.append("{}{}=X".format(currency['index'], default_currency['index']))
-        c_index[currency['index']] = currency['id']
-    cmd = "http://download.finance.yahoo.com/d/quotes.csv?f=sl1d1&s={}".format(','.join(param))
+    for currency in DB.query(Currency).all():
+        param.append("{}{}=X".format(currency, default_currency))
+        c_index[currency.index] = currency.id
+    cmd = "http://download.finance.yahoo.com/d/quotes.csv?f=sl1d1t1&s={}".format(','.join(param))
     conn.request("GET", cmd)
+
     param = []
-    
+    objects=[]
     for row in csv.reader(conn.getresponse().read().decode("utf-8", "strict").split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
         if len(row) < 1: continue
-        param.append(
-            (
-                default_currency['id'],
-                c_index[row[0].replace('{}=X'.format(default_currency['index']), '')],
-                float(row[1])
-            )
-        )
-    cur = db.executemany(
-        'insert into rates ("rate_date", "currency_a", "currency_b", "rate") values (datetime("now"), ?, ?, ?)',
-        param
-        )
-    db.commit()
+        print(default_currency, default_currency.id, default_currency.index)
+        print(c_index[row[0].replace('{}=X'.format(default_currency.index),'')])
+        objects.append(Rate(rate_date=datetime.datetime.strptime("{} {}".format(row[2], row[3]), "%m/%d/%Y %I:%M%p"),
+                            currency_a=default_currency.id,
+                            currency_b=c_index[row[0].replace('{}=X'.format(default_currency.index),'')],
+                            rate=float(row[1])))
+    DB.bulk_save_objects(objects)    
+    
     try:
         if request.method == 'GET':
             return redirect(url_for('dispatcher', api='currency'))
@@ -104,9 +90,9 @@ def update_rates():
 @app.route('/income')
 def show_incomes():
     return render_template('show_entries.html',
-        entries=income_GET(),
+        entries=income_GET().values(),
         currencies=currency_GET(),
-        periods=intervals_GET())
+        periods=intervals_GET().values())
 
 
 @app.route('/income/modify', methods=['POST'])
@@ -114,23 +100,28 @@ def add_entry():
     
     if not session.get('logged_in'):
         abort(401)
-    db = get_db()
-    parameters = [request.form['title'], 
-                int(request.form['currency']),
-                float(request.form['sum']),
-                request.form['start_date'],
-                request.form['end_date'],
-                int(request.form['period'])
-                ]
-    if request.form['submit'] == 'Insert':
-        cmd = 'insert into incomes (title, currency, sum, start_date, end_date, period) values (?, ?, ?, ?, ?, ?)'
-    else:
-        cmd = "update incomes set title = ?, currency = ?, sum = ?, start_date = ?, end_date = ?, period = ? where id = ?"
-        parameters.append(int(request.form['hidden_id']))
-    # open('/tmp/debug','w').write("{}".format(request.form))
-    db.execute( cmd, parameters)
-    db.commit()
-    flash('New entry was successfully posted')
+    try:
+        current_income = DB.query(Income).get(int(request.form['hidden_id']))
+        current_income.title = request.form['title']
+        current_income.currency_id=int(request.form['currency'])
+        current_income.sum=float(request.form['sum'])
+        current_income.start_date=datetime.datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
+        current_income.end_date=(None if request.form['end_date'] =='' else atetime.datetime.strptime(request.form['end_date'], '%Y-%m-%d').date())
+        current_income.period_id=int(request.form['period'])
+
+    except:
+        current_income = Income(
+        id=int(request.form['period']),
+        title=request.form['title'],
+        currency_id=int(request.form['currency']),
+        sum=float(request.form['sum']),
+        start_date=datetime.datetime.strptime(request.form['start_date'], '%Y-%m-%d').date(),
+        end_date=(None if request.form['end_date'] =='' else atetime.datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()),
+        period_id=int(request.form['period']))
+        DB.add(current_income)
+
+    DB.commit()
+    #flash('New entry was successfully posted')
     return redirect(url_for('show_incomes'))
 
 
@@ -157,61 +148,55 @@ def logout():
 
     
 def currency_GET(*args, **kwargs):
-    db = get_db()
-    currency_ids = []
-    if 'currency_ids' in kwargs:
-        currency_ids = kwargs['currency_ids']
-    cur = db.execute("""
-    select 
-        distinct currency.id,
-        currency."index",
-        rates.rate,
-        max(rates.rate_date) as rate_date,
-        currency."default"
-    from currency, rates
-    where rates.currency_b = currency.id 
-    {}
-    group by currency."index"
-    order by currency."index"
-    """.format(
-        "and currency.id in ({})".format(
-            ','.join(map(str, currency_ids))) if len(currency_ids)>0 else ""))
-    entries = cur.fetchall()
+    entries = {}
+
+    if 'id' in kwargs and kwargs['id']:
+        try:
+            q, rate, l = DB.query( Rate.currency_b, Rate, func.max(Rate.rate_date)).filter_by(currency_b=kwargs['id']).group_by(Rate.currency_b).first()
+        
+            return rate.to_dict()
+        except TypeError:
+            return {}
+
+    else:
+        for currency_id, rate, rate_date in DB.query(Rate.currency_b, Rate, func.max(Rate.rate_date)).group_by(Rate.currency_b).all():
+            entries.update(rate.to_dict())
     return entries
 
 def income_GET(*args, **kwargs):
-    db = get_db()
-    cur = db.execute('''
-    select
-        incomes.id as id,
-        incomes.title as title,
-        incomes.sum as sum,
-        currency."index" as currency,
-        currency.id as currency_id,
-        intervals.title as period,
-        intervals.id as interval,
-        incomes.start_date as start,
-        incomes.end_date as end
-    from
-        incomes,
-        currency,
-        intervals
-    where
-        currency.id = incomes.currency
-        and
-        intervals.id = incomes.period
-    order by id desc
-    ''')
-    entries = cur.fetchall()
+    entries = {}
+    for e in DB.query(Income).all():
+        entries.update(e.to_dict())
     return entries
-    
+
+def income_DELETE(*args, **kwargs):
+    id = request.form['id']
+    income = DB.query(Income).filter_by(id=int(id)).delete()
+    DB.commit()
+    return {'deleted': id}   
 incomes_GET = income_GET
+
+def balance_GET(*args, **kwargs):
+    r = {}
+    if 'end_date' in kwargs:
+        e = kwargs['end_date']
+    incomes = DB.query(Income).all()
+    for i in incomes:
+        
+        #print(e, i.get_sum(start_date=kwargs['start_date'], end_date=kwargs['end_date']))
+        s = i.get_sum(start_date=kwargs['start_date'], end_date=kwargs['end_date'])[2]
+        try:
+            r[i.currency.index] += s
+        except KeyError:
+            r[i.currency.index] = s
+    return r
+
 
 def intervals_GET(*args, **kwargs):
     """ load intervals from database """
-    db = get_db()
-    cur = db.execute('select id, title, item, value from intervals order by id desc')
-    entries = cur.fetchall()
+    entries = {}
+    for e in DB.query(Interval).all():
+        entries.update(e.to_dict())
     return entries
 
 def plan_GET(*args, **kwargs):
@@ -235,6 +220,14 @@ def plan_GET(*args, **kwargs):
 
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
-@app.route('/api/<path:api>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
-def dispatcher(api):
-    return json.dumps(to_dict(globals()["{}_{}".format(api, request.method)]([])))
+@app.route('/api/<string:api>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
+@app.route('/api/<string:api>/<int:id>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
+def dispatcher(api, id=None):
+    return json.dumps(globals()["{}_{}".format(api, request.method)](id=id ), default=json_serial)
+
+@app.route('/api/balance/<string:start_date>/<string:end_date>', defaults={'api':'balance'}, methods=['GET'])
+@app.route('/api/balance/<string:end_date>', defaults={'api':'balance', 'start_date': datetime.date.today().strftime("%Y-%m-%d")}, methods=['GET'])
+
+def balance(api, start_date, end_date):
+    return json.dumps(globals()["{}_{}".format(api, request.method)](start_date=datetime.datetime.strptime(start_date, '%Y-%m-%d').date(),
+         end_date=datetime.datetime.strptime(end_date, '%Y-%m-%d').date()), default=json_serial)
