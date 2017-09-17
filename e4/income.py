@@ -27,12 +27,12 @@ class Interval(Base):
         return "{}:{}{}".format(self.title, self.value, self.item)
     
     def to_dict(self):
-        return {self.id: {
+        return {
             "id": self.id,
             "title": self.title,
             "item": self.item,
             "value": self.value
-        }}
+        }
 
 class Rate(Base):
     __tablename__ = 'rates'
@@ -50,26 +50,26 @@ class Rate(Base):
         return "{}={:.4f}*{}".format(self.b,  self.rate, self.a)
 
     def to_dict(self):
-        return {self.currency_b: {
-            "index": self.b.index,
+        return {
+            "id": self.currency_b,
+            "title": self.b.title,
             "rate": self.rate,
             "rate_date": self.rate_date.date().isoformat(),
             "default": self.b.default
-            }
         }
 
 class Currency(Base):
     __tablename__ = 'currency'
     id = Column(Integer, primary_key=True)
-    index = Column(String)
+    title = Column(String)
     name = Column(String)
     default = Column(Integer)
 
     def __repr__(self):
-        return "{}".format(self.index)
+        return "{}".format(self.title)
 
     def to_dict(self):
-        return {self.id: {'id': self.id, 'index': self.index, 'name': self.name, 'default': self.default}}
+        return {'id': self.id, 'title': self.title, 'name': self.name, 'default': self.default}
 
 
 class Income(Base):
@@ -93,7 +93,7 @@ class Income(Base):
             'id': self.id,
             'title': self.title,
             'currency_id': self.currency_id,
-            'currency': self.currency.index,
+            'currency': self.currency.title,
             'sum': self.sum,    
             'start': self.start_date.isoformat(),
             'end': (None if self.end_date == None else self.end_date.isoformat()),
@@ -138,6 +138,12 @@ class Account(Base):
     currency = relationship('Currency')
     transactions = relationship('Transaction')  # , back_populates='account')
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'currency': self.currency
+        }
     def __repr__(self):
         return "{:10s}".format(self.title)
 
@@ -184,6 +190,19 @@ class Transaction(Base):
     income = relationship("Income")  # , back_populates='transactions')
     comment = Column(Text)
 
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "time": self.time,
+            "account": self.account,
+            "currency": self.currency,
+            "sum": self.sum,
+            "transfer": self.transfer,
+            "income": self.income,
+            "comment": self.comment 
+        }
+
     def __repr__(self):
         return "{:6d} {} {} {} {:8.2f} {} {}".format(self.id, self.time, self.account, self.currency, self.sum, self.transfer, self.income)
 
@@ -212,7 +231,7 @@ if __name__ == '__main__':
     # print(a2.id)
     # s.commit()
     c1 = DB.query(Currency).get(1)
-    c2 = DB.query(Currency).filter_by(index='USD').first()
+    c2 = DB.query(Currency).filter_by(title='USD').first()
     t1 = Transaction(time=datetime.now(), account=a1, sum=666, currency=c1)
     t2 = Transaction(time=datetime.now(), account=a2, sum=-6666, currency=c2)
     DB.add(t1)

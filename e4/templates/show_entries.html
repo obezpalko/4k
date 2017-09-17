@@ -1,26 +1,20 @@
 {% extends "layout.html" %}
 {% block js %}
+<!--
 <script src="{{url_for('static', filename='up.js')}}"></script>
-
+-->
 <script>
-$( document ).ready(function() { 
-  $.getJSON('/api/currency', function(data){
-    var options = [];
-    $.each(data, function(key, val){
-      options.push(
-        "<option value='" +
-        key + "'" + ((val['default'] == 1) ? " selected>" : ">") + val['index'] + "</option>");
-    });
-  $("#currency_id").html(options.join(''));
-  });
-  
-});
+
+
   
 </script>
 
 {% endblock %}
 {% block body %}
+
   {% if session.logged_in %}
+  {% endif %}
+  
     <form action="{{ url_for('add_entry') }}" method=post class=add-entry id="income">
       <table style="font-size:66%; width:50%;">
         <caption>edit income</caption>
@@ -31,41 +25,60 @@ $( document ).ready(function() {
           <th>Summ</th>
           <th>Dates</th>
           <th>Period</th>
-          <th>&nbsp;</th>
+          <th><a href='#' onclick="$('#income').hide();">close</a></th>
         </tr>
         <tr>
           <td  style="display:none;"><input type=text name=hidden_id id=hidden_id value=new size=4></td>
           <td><input type=text size=30 name=title id=title></td>
           <td>
-            <select name=currency id=currency_id>
+            <select name=currency id=currency_id class=currency_selector>
             {% for c in currencies %}
-              <option value="{{ c.currency_id }}"{% if c.default ==1 %} selected{% endif %}>{{ c.index }}</option>
+              <option value="{{ c.currency_id }}"{% if c.default ==1 %} selected{% endif %}>{{ c.title }}</option>
             {% endfor %}          
             </select>
           </td>
           <td><input name=sum size=11 id=sum></td>
           <td><input name=start_date size=11 id=start> <input name=end_date size=11 id=end></td>
-          <td>
-            <select name=period id=period>
-              {% for p in periods %}
-              <option value="{{ p.id }}">{{ p.title }}</option>
-              {% endfor %}
-            </select>
-           </td>
+          <td><select name=period id=period class="period_selector"></select></td>
           <td><input type=submit id=submit name=submit value=Insert></td>
         </tr>
       </table>
     </form>
-  {% endif %}
-  <table class=entries style="font-size:66%; width:45%;" id=incomes_table>
+
+    <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="transaction">
+        <table style="font-size:66%; width:50%;">
+          <caption>edit transaction</caption>
+          <tr>
+            <th style="display:none;">ID</th>
+            <th>Time</th>
+            <th>Summ</th>
+            <th>Account</th>
+            <th>Comment</th>
+            <th><a href='#' onclick="$('#transaction').hide();">close</a></th>
+          </tr>
+          <tr>
+            <td  style="display:block;"><input type=text name=id class=id value=new size=4></td>
+            <td><input type=text size=30 name=title class=time></td>
+            <td><input name=sum size=11 class=sum></td>
+            <td><select name=account class="account account_selector"></select></td>
+            <td><input name=sum size=11 id=sum></td>
+            <td><input name=start_date size=11 id=start> <input name=end_date size=11 id=end></td>
+            <td><select name=period class="period_selector"></select></td>
+            <td><input type=submit id=submit name=submit value=Insert></td>
+          </tr>
+        </table>
+      </form>
+  
+  <table class=entries id=incomes_table>
     <caption>Incomes</caption>
     <tr>
-      <td colspan=4>
-        
-      </td>
-      <td>
-        <a href=# onclick="update_income(event)"><img width='10' height='10' src='/static/iconmonstr-edit-8.svg'/></a>
-      </td>
+        <th>Title</th>
+        <th>Summ</th>
+        <th>Currency</th>
+        <th>Dates</th>
+        <th><a href=# onclick="update_income(event)"><img width='10' height='10' src='/static/iconmonstr-edit-8.svg'/></a></th>
+      </tr>
+
   {% for entry in entries %}
   <tr>
     <td>
@@ -93,4 +106,27 @@ $( document ).ready(function() {
     </tr>
   {% endfor %}
       </table>
+   <table id=transactions_table>
+      <caption>transactions</caption>
+      <tr>
+        <th style="display:none;">ID</th>
+        <th>id</th>
+        <th>time</th>
+        <th>sum</th>
+        <th>account</th>
+        <th>comment</th>
+        <th><a href=# onclick="update_row(event, '#transaction')"><img width='10' height='10' src='/static/iconmonstr-edit-8.svg'/></a></th>
+      </tr>
+      <tr>
+{% for entry in transactions %}
+     <tr>
+       <td class=id>{{ entry.id }}</td>
+       <td>{{ entry.time }}</td>
+       <td class=sum>{{ entry.sum }}</td>
+       <td>{{ entry.account.title }} ({{ entry.account.currency.title }})</td>
+       <td>{{ entry.comment }})</td>
+       <td><a href=# onclick="update_row(event, '#transaction')"><img width='10' height='10' src='/static/iconmonstr-edit-5.svg'/></a>&nbsp;<a href=# onclick="delete_transaction(event)"><img width='10' height='10' src='/static/iconmonstr-x-mark-7.svg'/></a></td>
+     </tr>
+{% endfor %}
+   </table>
 {% endblock %}
