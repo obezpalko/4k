@@ -102,3 +102,4 @@ ENV/
 *.yml
 *.csv
 e4/*.db
+e4/.sql
