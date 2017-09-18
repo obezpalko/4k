@@ -89,7 +89,7 @@ class Income(Base):
         return "{:20s} {}".format(self.title, self.currency)
     
     def to_dict(self):
-        return {self.id: {
+        return {
             'id': self.id,
             'title': self.title,
             'currency_id': self.currency_id,
@@ -99,7 +99,7 @@ class Income(Base):
             'end': (None if self.end_date == None else self.end_date.isoformat()),
             'interval': self.period.id,
             'period': self.period.title
-        }}
+        }
     def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
         list_dates = []
         s = 0
@@ -178,7 +178,7 @@ class Balance(object):
 class Transaction(Base):
     __tablename__ = 'transactions'
     id = Column(Integer, primary_key=True)
-    time = Column(DateTime, nullable=False)
+    time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")  # , back_populates='transactions')
     currency_id = Column(Integer, ForeignKey('currency.id'))
@@ -194,7 +194,7 @@ class Transaction(Base):
     def to_dict(self):
         return {
             "id": self.id,
-            "time": self.time,
+            "time": self.time.date().isoformat(),
             "account": self.account,
             "currency": self.currency,
             "sum": self.sum,

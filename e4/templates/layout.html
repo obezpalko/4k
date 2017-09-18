@@ -15,13 +15,13 @@ h2              { font-size: 1.2em; }
 .entries        { list-style: none; margin: 0; padding: 0; }
 .entries li     { margin: 0.8em 1.2em; }
 .entries li h2  { margin-left: -1em; }
-.add-entry      { font-size: 0.9em; border-bottom: 1px solid #ccc; }
+.add-entry      { display: none; font-size: 0.9em; border-bottom: 1px solid #ccc; }
 .add-entry dl   { font-weight: bold; }
-
 .metanav        { text-align: right; font-size: 0.8em; padding: 0.3em;
                   margin-bottom: 1em; background: #fafafa; }
 .flash          { background: #cee5F5; padding: 0.5em;
                   border: 1px solid #aacbe2; }
+.hidden { display: none; }
 .error          { background: #f0d6d6; padding: 0.5em; }
 .currencies     { display: block; width: 50%; float: right; 
                   list-style-type: none; padding: 0; font-family: monospace; 
@@ -46,7 +46,9 @@ table#incomes_table, table#transactions_table {
   margin-left: 3em;
 }
 </style>
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 <script src="//code.jquery.com/jquery-3.2.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 <!-- Latest compiled and minified CSS - >
 <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" />
 < ! -- Optional theme - >
@@ -57,22 +59,12 @@ table#incomes_table, table#transactions_table {
 <script>
 //$( document ).ready(function() { c_update('/api/currency') ; get_balance() });
 $( document ).ready( function() { 
-  /*
-  $.getJSON('/api/currency', function(data){
-    var options = [];
-    $.each(data, function(key, val){
-      options.push(
-        "<option value='" +
-        key + "'" + ((val['default'] == 1) ? " selected>" : ">") + val['index'] + "</option>");
-    });
-  $("#currency_id").html(options.join(''));
-  });
-  */
+
   update_option('.account_selector', '/api/account',['title', 'currency']);
   update_option('.period_selector', '/api/intervals');
   update_option('.currency_selector', '/api/currency');
   c_update('/api/currency');
-  get_balance();
+  get_balance('/api/balance/0/2018-01-01');
 });
 
 function update_option(element, url, title_fields=['title']){
@@ -81,46 +73,31 @@ function update_option(element, url, title_fields=['title']){
     $.each(data, function(key, val){
       titles = []
       title_fields.forEach( function(t){ titles.push( (t=='title') ? val[t] : val[t]['title'])});
-      options.push('<option value="'+ key +'"'+ ((val['default']==1) ? " selected" : "") +'>'+ titles.join(' ') +'</option>')
+      options.push('<option value="'+ val['id'] +'"'+ ((val['default']==1) ? " selected" : "") +'>'+ titles.join(' ') +'</option>')
     });
-    $(element).html(options.join(''))
+    $(element).html(options.join(''));
   })
 }
 
 function update_row(event, to_update){
   var id;
+  // console.log($(to_update).find('.account'));
   id = $($(event.target).parents('tr').find('.row_id')[0]).text();
+  // console.log($(to_update));
+  $(event.target).parents('tr').find('.row_update').each(function(){
+    var n , v;
+    n = $(this).attr('name');
+    v = $(this).text();
+    $(to_update).find("[name='" + n + "']" ).each(function(){
+      $(this).val( v )
+    });
+  });
+  $(to_update + " .datepicker").each(function(){$(this).datepicker({setDate: /*$(this).text()*/'2010-10-10'})});
+  $(to_update).dialog({buttons:[{text: 'Ok', click: function(){$(this).dialog( "close" );}}]}).focus();
+}
 
-  $(to_update).show();
-}
-function update_income(event) {
-  var id;
-  $('#income').show();
-  id = $($(event.target).parents('tr').find('.income_id')[0]).text();
-  
-  $("#hidden_id").val(id);
-  var a = ['title', 'sum', 'currency_id', 'start', 'end', 'period'];
-  $.each(a, function(element){
-    //console.log(a[element] + '=' + $(("#" + a[element] + "_" + id)).text());
-    $(("#" + a[element])).val($(("#" + a[element] + "_" + id)).text());
-  });
-  $("#submit").val('Update');
-}
-function update_transaction(event) {
-  var id;
-  $('#income').show();
-  id = $($(event.target).parents('tr').find('.income_id')[0]).text();
-  
-  $("#hidden_id").val(id);
-  var a = ['title', 'sum', 'currency_id', 'start', 'end', 'period'];
-  $.each(a, function(element){
-    //console.log(a[element] + '=' + $(("#" + a[element] + "_" + id)).text());
-    $(("#" + a[element])).val($(("#" + a[element] + "_" + id)).text());
-  });
-  $("#submit").val('Update');
-}
-async function get_balance(){
-  $.getJSON('/api/balance/2018-01-01', function(data){
+function get_balance(url){
+  $.getJSON(url, function(data){
     t = [];
     $.each(data, function(key, val){
       t.push('<li>' + key + ': ' + val + '</li>')
@@ -132,21 +109,22 @@ async function get_balance(){
 function delete_income(event) {
   var id;
   $('#income').hide();
-  id = $($(event.target).parents('tr').find('.income_id')[0]).text();
+  id = $($(event.target).parents('tr').find('[name="id"]')[0]).text();
 
   $.ajax({
     type: "DELETE",
-    url: "/api/income",
+    url: "/api/income/" + id,
     data: "id=" + id,
     success: function(msg){
         console.log("Data Deleted: " + msg);
+        $($(event.target).parents('tr')).remove();
+        get_balance();
     }
   });
-  $($(event.target).parents('tr')).remove();
-  get_balance();
+  
 }
 
-async function c_update(url){
+function c_update(url){
   if ($("#currency_refresh_img")) {
     $("#currency_refresh").hide();
   }
@@ -163,7 +141,9 @@ async function c_update(url){
     $("#currency_refresh").show();
   })
 }
-
+$( function() {
+    $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, setDate: new Date() });
+  } );
 
 </script>
 {% block js %}

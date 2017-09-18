@@ -15,8 +15,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func
 
 
-app = Flask(__name__)  # create the application instance :)
-app.config.from_object(__name__)  # load config from this file , flaskr.py
+app = Flask(__name__) # create the application instance :)
+app.config.from_object(__name__) # load config from this file , flaskr.py
 
 # Load default config and override config from an environment variable
 app.config.update(dict(
@@ -28,14 +28,13 @@ app.config.update(dict(
     SQLALCHEMY_DATABASE_URI='sqlite:///e4.db'
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
-
+ 
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
 
     if isinstance(obj, (datetime.datetime, datetime.date)):
         return obj.isoformat()
-    # if obj.__class__.__name__ in  ['Currency']:
     if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
         return obj.to_dict()
     raise TypeError("Type %s not serializable" % type(obj))
@@ -75,9 +74,9 @@ def update_rates():
     for row in csv.reader(conn.getresponse().read().decode("utf-8", "strict").split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
         if len(row) < 1:
             continue
-        print(default_currency, default_currency.id, default_currency.title)
-        print(c_title[row[0].replace(
-            '{}=X'.format(default_currency.title), '')])
+        # print(default_currency, default_currency.id, default_currency.title)
+        # print(c_title[row[0].replace(
+        #    '{}=X'.format(default_currency.title), '')])
         objects.append(Rate(rate_date=datetime.datetime.strptime("{} {}".format(row[2], row[3]), "%m/%d/%Y %I:%M%p"),
                             currency_a=default_currency.id,
                             currency_b=c_title[row[0].replace(
@@ -98,10 +97,10 @@ def update_rates():
 @app.route('/income')
 def show_incomes():
     return render_template('show_entries.html',
-                           entries=income_GET().values(),
-                           currencies=currency_GET(),
-                           periods=intervals_GET(),
-                           transactions=transaction_GET()
+                           entries=income_GET(id=0),
+                           currencies=currency_GET(id=0),
+                           periods=intervals_GET(id=0),
+                           transactions=transaction_GET(id=0)
                            )
 
 
@@ -177,16 +176,13 @@ def currency_GET(*args, **kwargs):
 
 
 def income_GET(*args, **kwargs):
-    entries = {}
-    for e in DB.query(Income).all():
-        entries.update(e.to_dict())
-    return entries
+    return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
 
 
 def income_DELETE(*args, **kwargs):
     id = request.form['id']
     income = DB.query(Income).filter_by(id=int(id)).delete()
-    DB.commit()
+    # DB.commit()
     return {'deleted': id}
 
 
@@ -194,10 +190,12 @@ incomes_GET = income_GET
 
 
 def transaction_GET(*args, **kwargs):
-    return DB.query(Transaction).all()
+    """ load intervals from database """
+    return DB.query(Transaction).all() if kwargs['id'] == 0 else DB.query(Transaction).get(kwargs['id'])
 
 
 def balance_GET(*args, **kwargs):
+    # print(args, kwargs)
     r = {}
     if 'end_date' in kwargs:
         e = kwargs['end_date']
@@ -220,12 +218,13 @@ def balance_GET(*args, **kwargs):
 
 def intervals_GET(*args, **kwargs):
     """ load intervals from database """
-    return DB.query(Interval).all() if ('id' not in kwargs or kwargs['id'] == None) else DB.query(Interval).get(int(kwargs['id']))
+    return DB.query(Interval).all() if kwargs['id'] == 0 else DB.query(Interval).get(kwargs['id'])
 
 
 def account_GET(*args, **kwargs):
     """ load intervals from database """
-    return DB.query(Account).all() if kwargs['id'] == None else DB.query(Account).get(int(kwargs['id']))
+    # return(kwargs)
+    return DB.query(Account).all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
 
 
 def plan_GET(*args, **kwargs):
@@ -247,16 +246,32 @@ def plan_GET(*args, **kwargs):
             }
             }
 
-
-@app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
-@app.route('/api/<string:api>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'], defaults={'id': None})
-@app.route('/api/<string:api>/<int:id>', methods=['GET', 'POST', 'PUT', 'DELETE', 'UPDATE'])
-def dispatcher(api, id=None):
-    return json.dumps(globals()["{}_{}".format(api, request.method)](id=id), default=json_serial)
+def transactions_GET(*args, **kwargs):
+    return kwargs, args
 
 
-@app.route('/api/balance/<string:start_date>/<string:end_date>', defaults={'api': 'balance'}, methods=['GET'])
-@app.route('/api/balance/<string:end_date>', defaults={'api': 'balance', 'start_date': datetime.date.today().strftime("%Y-%m-%d")}, methods=['GET'])
-def balance(api, start_date, end_date):
-    return json.dumps(globals()["{}_{}".format(api, request.method)](start_date=datetime.datetime.strptime(start_date, '%Y-%m-%d').date(),
-                                                                     end_date=datetime.datetime.strptime(end_date, '%Y-%m-%d').date()), default=json_serial)
+defaults = {
+        'id': 0,
+        'start_date': '1970-01-01',
+        'end_date': '9999-12-31',
+        'account': 0
+        }
+methods=['GET']
+@app.route('/api', defaults={'api': 'balance'}, methods=methods)
+@app.route('/api/<string:api>', defaults={'id': 0}, methods=methods)
+@app.route('/api/<string:api>/<int:id>', defaults={'end_date': '9999-12-31'}, methods=['GET', 'DELETE'])
+@app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': '1970-01-01'}, methods=methods)
+@app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=methods)
+def dispatcher(*args, **kwargs):
+    
+    # print(args, kwargs)
+    try:
+        start_date = datetime.datetime.strptime(start_date, '%Y-%m%d')
+    except:
+        start_date = datetime.datetime.now()
+    try:
+        end_date = datetime.datetime.strptime(start_date, '%Y-%m%d')
+    except:
+        end_date = datetime.datetime.now().replace(year=datetime.datetime.now().year+1)
+    kwargs.update({'start_date': start_date.date(), 'end_date': end_date.date()})
+    return json.dumps(globals()["{}_{}".format(kwargs['api'], request.method)](*args, **kwargs), default=json_serial)
