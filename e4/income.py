@@ -97,7 +97,7 @@ class Income(Base):
             'sum': self.sum,    
             'start': self.start_date.isoformat(),
             'end': (None if self.end_date == None else self.end_date.isoformat()),
-            'interval': self.period.id,
+            'period_id': self.period.id,
             'period': self.period.title
         }
     def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
@@ -181,8 +181,6 @@ class Transaction(Base):
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")  # , back_populates='transactions')
-    currency_id = Column(Integer, ForeignKey('currency.id'))
-    currency = relationship("Currency")  # , back_populates='transactions')
     sum = Column(Float, nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation
@@ -194,9 +192,8 @@ class Transaction(Base):
     def to_dict(self):
         return {
             "id": self.id,
-            "time": self.time.date().isoformat(),
+            "time": self.time.isoformat(),
             "account": self.account,
-            "currency": self.currency,
             "sum": self.sum,
             "transfer": self.transfer,
             "income": self.income,
@@ -204,7 +201,7 @@ class Transaction(Base):
         }
 
     def __repr__(self):
-        return "{:6d} {} {} {} {:8.2f} {} {}".format(self.id, self.time, self.account, self.currency, self.sum, self.transfer, self.income)
+        return "{:6d} {} {} {:8.2f} {} {}".format(self.id, self.time, self.account,  self.sum, self.transfer, self.income)
 
 
 engine = create_engine('sqlite:///e4/e4.db')

@@ -2,7 +2,7 @@
 import os
 import sqlite3
 from flask import Flask, request, session, g, redirect, url_for, abort, \
-    render_template, flash
+    render_template, flash, Response
 # from flask_sqlalchemy import SQLAlchemy
 import http.client
 import json
@@ -40,24 +40,23 @@ def json_serial(obj):
     raise TypeError("Type %s not serializable" % type(obj))
 
 
-@app.teardown_appcontext
-def close_db(error):
-    """Closes the database again at the end of the request."""
-    if hasattr(g, 'sqlite_db'):
-        g.sqlite_db.close()
+#@app.teardown_appcontext
+#def close_db(error):
+#    """Closes the database again at the end of the request."""
+#    if hasattr(g, 'sqlite_db'):
+#       g.sqlite_db.close()
 
 
-@app.cli.command('initdb')
-def initdb_command():
-    """Initializes the database."""
-    init_db()
-    print('Initialized the database.')
+#@app.cli.command('initdb')
+#def initdb_command():
+#    """Initializes the database."""
+#    init_db()
+#    print('Initialized the database.')
 
 
 @app.cli.command('rates')
 @app.route('/update_rates')
 def update_rates():
-    # db = get_db()
     default_currency = DB.query(Currency).filter_by(default=1).first()
     conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
     param = []
@@ -71,7 +70,9 @@ def update_rates():
 
     param = []
     objects = []
-    for row in csv.reader(conn.getresponse().read().decode("utf-8", "strict").split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
+    results = conn.getresponse().read().decode("utf-8", "strict")
+    
+    for row in csv.reader(results.split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
         if len(row) < 1:
             continue
         # print(default_currency, default_currency.id, default_currency.title)
@@ -83,6 +84,7 @@ def update_rates():
                                 '{}=X'.format(default_currency.title), '')],
                             rate=float(row[1])))
     DB.bulk_save_objects(objects)
+    DB.commit()
 
     try:
         if request.method == 'GET':
@@ -180,19 +182,98 @@ def income_GET(*args, **kwargs):
 
 
 def income_DELETE(*args, **kwargs):
-    id = request.form['id']
-    income = DB.query(Income).filter_by(id=int(id)).delete()
-    # DB.commit()
+    id = kwargs['id']
+    income = DB.query(Income).filter_by(id=id).delete()
+    DB.commit()
     return {'deleted': id}
 
 
 incomes_GET = income_GET
 
 
+def income_PUT(*args, **kwargs):
+    id = kwargs['id']
+    i = DB.query(Income).get(id)
+    
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    try:
+        i.title=obj['title']
+        i.currency_id=int(obj['currency_id'])
+        i.sum=float(obj['sum'])
+        i.start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date()
+        i.end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date())
+        i.period_id=int(obj['period_id'])
+    except:
+        abort(400)
+    DB.commit()
+    return {'updated': DB.query(Income).get(id), "previous": i}
+
+
+def income_POST(*args, **kwargs):
+    id = kwargs['id']
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    try:    
+        i=Income(
+            title=obj['title'],
+            currency_id=int(obj['currency_id']),
+            sum=float(obj['sum']),
+            start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date(),
+            end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date()),
+            period_id=int(obj['period_id'])
+        )
+        DB.add(i)
+        DB.flush()
+        DB.commit()
+    except:
+        abort(400)
+    return i
+
+def transaction_POST(*args, **kwargs):
+    id = kwargs['id']
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    print(obj)
+    try:    
+        i=Transaction(
+            time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
+            account_id=int(obj['account_id']),
+            sum=float(obj['sum']),
+            transfer=int(obj['transfer']),
+            income_id=int(obj['income_id']),
+            comment=obj['comment']
+        )
+        DB.add(i)
+        DB.flush()
+        DB.commit()
+    except:
+        abort(400)
+    return i
+
+def transaction_PUT(*args, **kwargs):
+    id = kwargs['id']
+    i = DB.query(Transaction).get(id)
+    
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    try:
+        i.time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date()
+        i.account_id=int(obj['account_id'])
+        i.sum=float(obj['sum'])
+        i.transfer=int(obj['transfer'])
+        i.income_id=int(obj['income_id'])
+        i.comment=obj['comment']
+    except:
+        abort(400)
+    DB.commit()
+    return {'updated': DB.query(Transaction).get(id), "previous": i}
+
 def transaction_GET(*args, **kwargs):
     """ load intervals from database """
     return DB.query(Transaction).all() if kwargs['id'] == 0 else DB.query(Transaction).get(kwargs['id'])
 
+def transaction_DELETE(*args, **kwargs):
+    id = kwargs['id']
+    income = DB.query(Transaction).filter_by(id=id).delete()
+    DB.commit()
+    return {'deleted': id}
 
 def balance_GET(*args, **kwargs):
     # print(args, kwargs)
@@ -258,8 +339,8 @@ defaults = {
         }
 methods=['GET']
 @app.route('/api', defaults={'api': 'balance'}, methods=methods)
-@app.route('/api/<string:api>', defaults={'id': 0}, methods=methods)
-@app.route('/api/<string:api>/<int:id>', defaults={'end_date': '9999-12-31'}, methods=['GET', 'DELETE'])
+@app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
+@app.route('/api/<string:api>/<int:id>', defaults={'end_date': '9999-12-31'}, methods=['GET', 'DELETE', 'PUT'])
 @app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': '1970-01-01'}, methods=methods)
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=methods)
 def dispatcher(*args, **kwargs):

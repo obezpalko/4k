@@ -58,13 +58,15 @@ table#incomes_table, table#transactions_table {
 < ! -- -->
 <script>
 //$( document ).ready(function() { c_update('/api/currency') ; get_balance() });
+var balance_url;
+balance_url = '/api/balance/0/2017-12-31'
 $( document ).ready( function() { 
 
   update_option('.account_selector', '/api/account',['title', 'currency']);
   update_option('.period_selector', '/api/intervals');
   update_option('.currency_selector', '/api/currency');
   c_update('/api/currency');
-  get_balance('/api/balance/0/2018-01-01');
+  get_balance(balance_url);
 });
 
 function update_option(element, url, title_fields=['title']){
@@ -79,21 +81,119 @@ function update_option(element, url, title_fields=['title']){
   })
 }
 
-function update_row(event, to_update){
-  var id;
-  // console.log($(to_update).find('.account'));
-  id = $($(event.target).parents('tr').find('.row_id')[0]).text();
-  // console.log($(to_update));
-  $(event.target).parents('tr').find('.row_update').each(function(){
+function getDialogButton( dialog_selector, button_name ) {
+  var buttons = dialog_selector.find(' .ui-dialog-buttonpane button' );
+  for ( var i = 0; i < buttons.length; ++i ) {
+     var jButton = $( buttons[i] );
+     if ( jButton.text() == button_name )
+     {
+         return jButton;
+     }
+  }
+  return null;
+}
+
+function update_row(event, to_update, clean=false){
+  var id, row;
+  id = $(event.target).parents('tr').find("[name=id]").text();
+  row = $(event.target).parents('tr');
+  // var new_row = $(event.target).parents('tr').siblings().first().clone(true);
+  var first_row = $(event.target).parents('tr').siblings().first();
+  //header_row.before($(event.target).parents('tr').siblings()[0]);
+  //$(event.target).parents('tr').siblings().first().before(new_row);
+  //console.log(header_row);
+  row.find('.row_update').each(function(){
     var n , v;
     n = $(this).attr('name');
     v = $(this).text();
-    $(to_update).find("[name='" + n + "']" ).each(function(){
+    $('#' + to_update).find("[name='" + n + "']" ).each(function(){
       $(this).val( v )
     });
   });
-  $(to_update + " .datepicker").each(function(){$(this).datepicker({setDate: /*$(this).text()*/'2010-10-10'})});
-  $(to_update).dialog({buttons:[{text: 'Ok', click: function(){$(this).dialog( "close" );}}]}).focus();
+  $('#' + to_update + " .datepicker").each(function(){$(this).datepicker({setDate: /*$(this).text()*/'2010-10-10'})});
+  var buttons=[];
+  if (! clean) {
+    buttons = [
+      
+      {text: 'Delete', click: function(){
+        $.ajax({
+          type: "DELETE",
+          url: "/api/" + to_update + "/" + id,
+          //data: "id=" + id,
+          data: "",
+          success: function(msg){
+            row.remove();
+            get_balance(balance_url);
+          }
+        });
+        $(this).dialog( "close" );
+      }},
+      {text: 'Ok', click: function(){
+          var data_={};
+          $(this).dialog().find(".form_save").each(function(f, k){
+            data_[k.name] = k.value.replace(/^\s+|\s+$/g,'');
+          });
+          $.ajax({
+            type: "PUT",
+            headers: { 
+              'Accept': 'application/json',
+              'Content-Type': 'application/json' 
+            },
+            dataType: 'json',
+            url: "/api/" + to_update + "/" + id,
+            data: JSON.stringify(data),
+            success: function(data){
+              updated=data['updated'];
+              row.find('.row_update').each(function(){
+                n = $(this).attr('name');
+                if ( n != 'id') { 
+                  $(this).text(updated[n]);
+                }
+              })
+            }
+          });
+          $(this).dialog( "close" );
+          get_balance(balance_url);
+      }}
+    ]
+
+  } else {
+    buttons = [
+    {text: 'Insert', click: function(){
+      var data={};
+      $(this).dialog().find(".form_save").each(function(f, k){
+        data[k.name] = k.value.replace(/^\s+|\s+$/g,'');
+      });
+      $.ajax({
+        type: "POST",
+        headers: { 
+          'Accept': 'application/json',
+          'Content-Type': 'application/json' 
+        },
+        dataType: 'json',
+        url: "/api/" + to_update ,
+        data: JSON.stringify(data),
+        success: function(data){
+          console.log(data);
+          var new_row = first_row.clone(true);
+          new_row.find('.row_update').each(function(){
+            n = $(this).attr('name');                
+            $(this).text(data[n]);
+          });
+          console.log(new_row);
+          first_row.before(new_row);
+        }
+      });
+      
+
+      $(this).dialog( "close" );
+      get_balance(balance_url);
+    }}
+    ]
+  }
+  
+  $('#' + to_update).dialog({ buttons: buttons }).focus();
+
 }
 
 function get_balance(url){
@@ -116,9 +216,9 @@ function delete_income(event) {
     url: "/api/income/" + id,
     data: "id=" + id,
     success: function(msg){
-        console.log("Data Deleted: " + msg);
+        // console.log("Data Deleted: " + msg);
         $($(event.target).parents('tr')).remove();
-        get_balance();
+        get_balance(balance_url);
     }
   });
   
@@ -136,7 +236,7 @@ function c_update(url){
         items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );
       }
     });
-    
+    get_balance(balance_url);
     $("#currencies").html(items.join( "" ));
     $("#currency_refresh").show();
   })
