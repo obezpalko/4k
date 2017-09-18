@@ -141,13 +141,24 @@ function update_row(event, to_update, clean=false){
             },
             dataType: 'json',
             url: "/api/" + to_update + "/" + id,
-            data: JSON.stringify(data),
+            data: JSON.stringify(data_),
             success: function(data){
               updated=data['updated'];
               row.find('.row_update').each(function(){
                 n = $(this).attr('name');
-                if ( n != 'id') { 
-                  $(this).text(updated[n]);
+                console.log(n);
+                if ( n != 'id') {
+                  sp = n.split('.');
+                  switch (sp.length) {
+                    case 2:
+                      $(this).text(updated[sp[0]][sp[1]]);
+                      break;
+                    case 3:
+                      $(this).text(updated[sp[0]][sp[1]][sp[2]]);
+                      break;
+                    default: 
+                      $(this).text(updated[n]);
+                  }
                 }
               })
             }

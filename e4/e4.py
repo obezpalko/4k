@@ -251,7 +251,6 @@ def transaction_POST(*args, **kwargs):
 def transaction_PUT(*args, **kwargs):
     id = kwargs['id']
     i = DB.query(Transaction).get(id)
-    
     obj=json.loads(request.data.decode('utf-8', 'strict'))
     try:
         i.time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date()

@@ -108,9 +108,9 @@
       <td class="hidden row_update" name=id>{{ entry.id }}</td>
       <td class=row_update name=time>{{ entry.time }}</td>
       <td class=row_update name=sum>{{ entry.sum }}</td>
-      <td class="hidden row_update" name=transfer>0</td>
-      <td class="hidden row_update" name=income_id>0</td>
-      <td><span class="hidden row_update" name=account_id>{{ entry.account.id }}</span><span name="account">{{ entry.account.title }}</span> (<span name=account_currency>{{ entry.account.currency.title }}</span>)</td>
+      <td class="hidden row_update" name=transfer>{{ entry.transfer }}</td>
+      <td class="hidden row_update" name=income_id>{{ entry.income_id }}</td>
+      <td><span class="hidden row_update" name=account_id>{{ entry.account_id }}</span><span class=row_update name="account.title">{{ entry.account.title }}</span> (<span class=row_update name=account.currency.title>{{ entry.account.currency.title }}</span>)</td>
       <td class=row_update name=comment>{{ entry.comment }}</td>
       <td>
           <span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span>
