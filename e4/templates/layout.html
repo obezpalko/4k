@@ -146,7 +146,6 @@ function update_row(event, to_update, clean=false){
               updated=data['updated'];
               row.find('.row_update').each(function(){
                 n = $(this).attr('name');
-                console.log(n);
                 if ( n != 'id') {
                   sp = n.split('.');
                   switch (sp.length) {
@@ -241,7 +240,7 @@ function c_update(url){
   }
   $.getJSON(url, function(data){
     var items = [];
-    items.push("<li><a id='currency_refresh' href='#' onClick='c_update(\"/update_rates\")'><img id='currency_refresh_img' width='10' height='10' src='/static/iconmonstr-refresh-2.svg'/></a></li>");
+    items.push("<li><span id='currency_refresh' class='ui-icon ui-icon-refresh' onClick='c_update(\"/update_rates\")'></span></li>");
     $.each( data, function( key, val ) {
       if (val["default"] == "0") {
         items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );

@@ -275,7 +275,6 @@ def transaction_DELETE(*args, **kwargs):
     return {'deleted': id}
 
 def balance_GET(*args, **kwargs):
-    # print(args, kwargs)
     r = {}
     if 'end_date' in kwargs:
         e = kwargs['end_date']
@@ -303,7 +302,6 @@ def intervals_GET(*args, **kwargs):
 
 def account_GET(*args, **kwargs):
     """ load intervals from database """
-    # return(kwargs)
     return DB.query(Account).all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
 
 
@@ -346,12 +344,12 @@ def dispatcher(*args, **kwargs):
     
     # print(args, kwargs)
     try:
-        start_date = datetime.datetime.strptime(start_date, '%Y-%m%d')
+        start_date = datetime.datetime.strptime(kwargs['start_date'], '%Y-%m-%d').date()
     except:
-        start_date = datetime.datetime.now()
+        start_date = datetime.date.today()
     try:
-        end_date = datetime.datetime.strptime(start_date, '%Y-%m%d')
+        end_date = datetime.datetime.strptime(kwargs['end_date'], '%Y-%m-%d').date()
     except:
-        end_date = datetime.datetime.now().replace(year=datetime.datetime.now().year+1)
-    kwargs.update({'start_date': start_date.date(), 'end_date': end_date.date()})
+        end_date = datetime.datetime.now().replace(year=datetime.datetime.now().year+1).date()
+    kwargs.update({'start_date': start_date, 'end_date': end_date})
     return json.dumps(globals()["{}_{}".format(kwargs['api'], request.method)](*args, **kwargs), default=json_serial)
