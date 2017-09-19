@@ -1,6 +1,7 @@
 #
 from datetime import datetime, date, time, timedelta
 from calendar import monthrange
+from math import ceil
 
 def dict_factory(cursor, row):
   d = {}
@@ -29,4 +30,8 @@ def next_date(current_date, period=(1, 'm'), count=1):
   if period[1] == 'd': return current_date + timedelta(period[0] * count)
   return add_months(current_date, period[0] * count)
 
-
+def number_of_weeks(date1, date2):
+  start_date = datetime.strptime(date1, '%Y-%m-%d').date()
+  start_date_monday = (start_date - timedelta(days=start_date.weekday()))
+  end_date = datetime.strptime(date2, '%Y-%m-%d').date()
+  return ceil((end_date - start_date_monday).days / 7.0)

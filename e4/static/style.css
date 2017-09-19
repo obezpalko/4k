@@ -9,33 +9,11 @@ h2              { font-size: 1.2em; }
 .entries        { list-style: none; margin: 0; padding: 0; }
 .entries li     { margin: 0.8em 1.2em; }
 .entries li h2  { margin-left: -1em; }
-.add-entry      { font-size: 0.9em; border-bottom: 1px solid #ccc; }
+.add-entry      { display: none; font-size: 0.9em; border-bottom: 1px solid #ccc; }
 .add-entry dl   { font-weight: bold; }
-
 .metanav        { text-align: right; font-size: 0.8em; padding: 0.3em;
                   margin-bottom: 1em; background: #fafafa; }
 .flash          { background: #cee5F5; padding: 0.5em;
                   border: 1px solid #aacbe2; }
+.hidden { display: none; }
 .error          { background: #f0d6d6; padding: 0.5em; }
-.currencies     { display: block; width: 50%; float: right; 
-                  list-style-type: none; padding: 0; font-family: monospace; 
-                  margin: 0; padding-right: 3em; background-color:  #FFFFFF; font-size: 75%; text-align: right; }
-.currencies li  { display: inline; padding-left: 0.3em; padding-right: 0.3em; }
-#balance { display: none; font-family: monospace; }
-#income  { display: none; }
-table#incomes_table, table#transactions_table { 
-  font-size:66%;
-  width:49%;
-  display: inline-block;
-  vertical-align: text-top;
-}
-
-#balance        {
-  width: 25%;
-  border-width: 2px;
-  border-style: solid;
-  border-color: green;
-  float: left;
-  background-color:  #FFFFFF;
-  margin-left: 3em;
-}

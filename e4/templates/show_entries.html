@@ -1,15 +1,107 @@
 {% extends "layout.html" %}
 {% block js %}
-<!--
-<script src="{{url_for('static', filename='up.js')}}"></script>
--->
 <script>
-  
-</script>
+  $( function() {
+    $( "#tabs" ).tabs();
+  } );
+  </script>
 
-{% endblock %}
+{% endblock %}<
 {% block body %}
+<div  style="border: 1px solid black; overflow: hidden;">
+    <div id=balance style="width:15%; float: left;">
+      <dl></dl>
+      <input name=start_date class="start_date datepicker" size=10>
+      <input name=end_date class="end_date datepicker" size=10>
+      </div>
 
+    <div id=tabs style="width:80%; overflow: hidden;">
+      <ul>
+        <li><a href="#tab-incomes">incomes</a></li>
+        <li><a href="#tab-transactions">transactions</a></li>
+       </ul>
+      <div id="tab-incomes">
+        <table class=entries id=incomes_table>
+        <caption>Incomes</caption>
+        <tr>
+          <th>Title</th>
+          <th>Summ</th>
+          <th>Currency</th>
+          <th>Dates</th>
+          <th>
+            <span href=# onclick="update_row(event, 'income', true); $('#income')[0].reset();" class="ui-icon ui-icon-document"></span>
+            </th>
+          </tr>
+        
+        {% for entry in entries %}
+        <tr>
+          <td>
+            <span class="hidden row_update" name=id >{{entry.id}}</span>
+            <span class=row_update name=title>{{ entry.title|safe }}</span>
+            </td>
+          <td class=row_update name=sum>
+              {{ entry.sum }}
+            </td>
+          <td>
+            <span name=currency class="row_update">{{ entry.currency }}</span>
+            <span class="hidden row_update" name=currency_id>{{ entry.currency_id }}</span>
+            </td>
+          <td>  
+            {{ entry.period.title }}
+            <span class="hidden row_update" name=period_id>{{ entry.period_id }}</span>
+              from <span name=start_date class=row_update> {{ entry.start_date.strftime('%Y-%m-%d') }}</span>
+              {% if entry.end_date %}
+              <span > till </span>
+              <span class=row_update name=end_date>{{ entry.end_date.strftime('%Y-%m-%d') }}</span>
+              {% endif %}
+            </td>
+          <td>
+            <span onclick="update_row(event, 'income')" class="ui-icon ui-icon-pencil"></span>
+            </td>
+          </tr>
+              {% else %}
+        <tr>
+          <td><em>Unbelievable.  No entries here so far</em></td>
+          </tr>
+          {% endfor %}
+        </table>
+
+        </div>
+
+      <div id="tab-transactions">
+        <table id=transactions_table>
+          <caption>transactions</caption>
+          <tr>
+            <th class="hidden">id</th>
+            <th>time</th>
+            <th>sum</th>
+            <th class=hidden>transfer</th>
+            <th class=hidden>income_id</th>
+            <th>account</th>
+            <th>comment</th>
+            <th>
+              <span href=# onclick="update_row(event, 'transaction', true); $('#transaction')[0].reset();" class="ui-icon ui-icon-document"></span>
+              </th>
+            </tr>
+          {% for entry in transactions %}
+          <tr>
+            <td class="hidden row_update" name=id>{{ entry.id }}</td>
+            <td class=row_update name=time>{{ entry.time }}</td>
+            <td class=row_update name=sum>{{ entry.sum }}</td>
+            <td class="hidden row_update" name=transfer>{{ entry.transfer }}</td>
+            <td class="hidden row_update" name=income_id>{{ entry.income_id }}</td>
+            <td>
+              <span class="hidden row_update" name=account_id>{{ entry.account_id }}</span>
+              <span class=row_update name="account.title">{{ entry.account.title }}</span>
+              (<span class=row_update name=account.currency.title>{{ entry.account.currency.title }}</span>)
+              </td>
+            <td class=row_update name=comment>{{ entry.comment }}</td>
+            <td><span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span></td>
+            </tr>
+          {% endfor %}
+          </table>
+        </div>
+      </div>
   {% if session.logged_in %}
   {% endif %}
   <form action="{{ url_for('add_entry') }}" method=post class=add-entry id="income">
@@ -20,102 +112,27 @@
       <dt>Summ</dt><dd><input name=sum size=11 class=form_save></dd>
       <dt>Dates</dt><dd><input name=start_date size=11 class="form_save datepicker"> <input name=end_date size=11 class="form_save datepicker"></dd>
       <dt>Period</dt><dd><select name=period_id class="form_save period_selector"></select></dd>
-    </dl>
-  </form>
-
-
+      </dl>
+   </form>
 
   <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="account">
       <dl>
         <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
         <dt>Title</dt><dd><input type=text size=30 name=title class="title" value=""></dd>
         <dt>Currency</dt><dd><select name=currency class="currency currency_selector"></select></dd>
-      </dl>
+        </dl>
     </form>
   
-  <table class=entries id=incomes_table>
-    <caption>Incomes</caption>
-    <tr>
-        <th>Title</th>
-        <th>Summ</th>
-        <th>Currency</th>
-        <th>Dates</th>
-        <th>
-          <span href=# onclick="update_row(event, 'income', true); $('#income')[0].reset();" class="ui-icon ui-icon-document"></span>
-        </th>
-      </tr>
-
-  {% for entry in entries %}
-  <tr>
-    <td>
-      <span class="hidden row_update" name=id >{{entry.id}}</span>
-      <span class=row_update name=title>{{ entry.title|safe }}</span>
-    </td>
-    <td class=row_update name=sum>
-      {{ entry.sum }}
-    </td>
-    <td>
-      <span name=currency class="row_update">{{ entry.currency }}</span>
-      <span class="hidden row_update" name=currency_id>{{ entry.currency_id }}</span>
-    </td>
-    <td>  
-      {{ entry.period.title }}
-      <span class="hidden row_update" name=period_id>{{ entry.period_id }}</span>
-      from <span name=start_date class=row_update> {{ entry.start_date.strftime('%Y-%m-%d') }}</span>
-      {% if entry.end_date %}
-      <span > till </span>
-      <span class=row_update name=end_date>{{ entry.end_date.strftime('%Y-%m-%d') }}</span>
-      {% endif %}
-    </td>
-    <td>
-      <span onclick="update_row(event, 'income')" class="ui-icon ui-icon-pencil"></span>
-    </td>
-      {% else %}
-    <tr>
-      <td><em>Unbelievable.  No entries here so far</em></td>
-    </tr>
-  {% endfor %}
-      </table>
-
-    <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="transaction">
-      <dl>
-        <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
-        <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
-        <dt>Time</dt><dd><input type=text size=30 name=time class="form_save datepicker"></dd>
-        <dt>Account</dt><dd><select name=account_id class="form_save account_selector"></select></dd>
-        <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
-        <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
-        <dt>Income_id</dt><dd><input name=income_id class=form_save value=0 disabled></input></dd>    
+  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="transaction">
+    <dl>
+      <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
+      <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
+      <dt>Time</dt><dd><input type=text size=30 name=time class="form_save datepicker"></dd>
+      <dt>Account</dt><dd><select name=account_id class="form_save account_selector"></select></dd>
+      <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
+      <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
+      <dt>Income_id</dt><dd><input name=income_id class=form_save value=0 disabled></input></dd>    
       </dl>
     </form>
-      
-   <table id=transactions_table>
-      <caption>transactions</caption>
-      <tr>
-        <th class="hidden">id</th>
-        <th>time</th>
-        <th>sum</th>
-        <th class=hidden>transfer</th>
-        <th class=hidden>income_id</th>
-        <th>account</th>
-        <th>comment</th>
-        <th>
-          <span href=# onclick="update_row(event, 'transaction', true); $('#transaction')[0].reset();" class="ui-icon ui-icon-document"></span>
-        </th>
-      </tr>
-{% for entry in transactions %}
-    <tr>
-      <td class="hidden row_update" name=id>{{ entry.id }}</td>
-      <td class=row_update name=time>{{ entry.time }}</td>
-      <td class=row_update name=sum>{{ entry.sum }}</td>
-      <td class="hidden row_update" name=transfer>{{ entry.transfer }}</td>
-      <td class="hidden row_update" name=income_id>{{ entry.income_id }}</td>
-      <td><span class="hidden row_update" name=account_id>{{ entry.account_id }}</span><span class=row_update name="account.title">{{ entry.account.title }}</span> (<span class=row_update name=account.currency.title>{{ entry.account.currency.title }}</span>)</td>
-      <td class=row_update name=comment>{{ entry.comment }}</td>
-      <td>
-          <span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span>
-      </td>
-    </tr>
-{% endfor %}
-   </table>
+ </div>
 {% endblock %}

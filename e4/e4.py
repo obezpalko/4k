@@ -276,8 +276,7 @@ def transaction_DELETE(*args, **kwargs):
 
 def balance_GET(*args, **kwargs):
     r = {}
-    if 'end_date' in kwargs:
-        e = kwargs['end_date']
+    
     incomes = DB.query(Income).all()
     for i in incomes:
         s = i.get_sum(start_date=kwargs['start_date'],
@@ -290,8 +289,12 @@ def balance_GET(*args, **kwargs):
     for c in currency_GET():
         if c['title'] in r:
             total += c['rate'] * r[c['title']]
-    r['<br/>TOTAL'] = float('{:10.2f}'.format(total))
-
+    r['TOTAL'] = '{:.2f}'.format(total)
+    r['start_date'] = kwargs['start_date']
+    r['end_date'] = kwargs['end_date']
+    w = number_of_weeks(kwargs['start_date'].strftime('%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
+    r['weeks'] = w
+    r['weekly'] = float('{:10.2}'.format(total/w))
     return r
 
 
@@ -335,10 +338,11 @@ defaults = {
         'account': 0
         }
 methods=['GET']
+s_date=datetime.date.today()
 @app.route('/api', defaults={'api': 'balance'}, methods=methods)
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
-@app.route('/api/<string:api>/<int:id>', defaults={'end_date': '9999-12-31'}, methods=['GET', 'DELETE', 'PUT'])
-@app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': '1970-01-01'}, methods=methods)
+@app.route('/api/<string:api>/<int:id>', defaults={'end_date': s_date.replace(year=(s_date.year+1))}, methods=['GET', 'DELETE', 'PUT'])
+@app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date.isoformat()}, methods=methods)
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=methods)
 def dispatcher(*args, **kwargs):
     

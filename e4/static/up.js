@@ -1,43 +1,27 @@
-function update_income(event) {
-  var id;
-  $('#income').show();
-  id = $($(event.target).parents('tr').find('.income_id')[0]).text();
-  
-  $("#hidden_id").val(id);
-  var a = ['title', 'sum', 'currency_id', 'start', 'end', 'period'];
-  $.each(a, function(element){
-    //console.log(a[element] + '=' + $(("#" + a[element] + "_" + id)).text());
-    $(("#" + a[element])).val($(("#" + a[element] + "_" + id)).text());
-  });
-  $("#submit").val('Update');
-}
 
-function get_balance(){
-  $.getJSON('/api/balance/2018-01-01', function(data){
-    t = [];
+
+function update_option(element, url, title_fields=['title']){
+  $.getJSON(url, function(data){
+    var options = [];
     $.each(data, function(key, val){
-      t.push('<li>' + key + ': ' + val + '</li>')
+      titles = []
+      title_fields.forEach( function(t){ titles.push( (t=='title') ? val[t] : val[t]['title'])});
+      options.push('<option value="'+ val['id'] +'"'+ ((val['default']==1) ? " selected" : "") +'>'+ titles.join(' ') +'</option>')
     });
-    $('#balance').html(t.join("")).show();
-  })  
-
+    $(element).html(options.join(''));
+  })
 }
 
-function delete_income(event) {
-  var id;
-  $('#income').hide();
-  id = $($(event.target).parents('tr').find('.income_id')[0]).text();
-
-  $.ajax({
-    type: "DELETE",
-    url: "/api/income",
-    data: "id=" + id,
-    success: function(msg){
-        console.log("Data Deleted: " + msg);
-    }
-  });
-  $($(event.target).parents('tr')).remove();
-  get_balance();
+function getDialogButton( dialog_selector, button_name ) {
+  var buttons = dialog_selector.find(' .ui-dialog-buttonpane button' );
+  for ( var i = 0; i < buttons.length; ++i ) {
+     var jButton = $( buttons[i] );
+     if ( jButton.text() == button_name )
+     {
+         return jButton;
+     }
+  }
+  return null;
 }
 
 function c_update(url){
@@ -46,13 +30,13 @@ function c_update(url){
   }
   $.getJSON(url, function(data){
     var items = [];
-    items.push("<li><a id='currency_refresh' href='#' onClick='c_update(\"/update_rates\")'><img id='currency_refresh_img' width='10' height='10' src='/static/iconmonstr-refresh-2.svg'/></a></li>");
+    items.push("<li><span id='currency_refresh' class='ui-icon ui-icon-refresh' onClick='c_update(\"/update_rates\")'></span></li>");
     $.each( data, function( key, val ) {
       if (val["default"] == "0") {
-        items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["index"] + ":" + val["rate"] + "</li>" );
+        items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );
       }
     });
-    
+    get_balance(balance_url);
     $("#currencies").html(items.join( "" ));
     $("#currency_refresh").show();
   })

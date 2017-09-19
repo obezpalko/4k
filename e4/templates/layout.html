@@ -1,54 +1,41 @@
 <!doctype html>
 <title>E4</title>
-<!--
-<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}" />
--->
-<style type=text/css>
-body            { font-family: sans-serif; background: #eee; }
-a, h1, h2       { color: #377ba8; }
-h1, h2          { font-family: 'Georgia', serif; margin: 0; }
-h1              { border-bottom: 2px solid #eee; }
-h2              { font-size: 1.2em; }
 
-.page           { margin: 2em auto; width: 85%; border: 5px solid #ccc;
-                  padding: 0.8em; background: white; }
-.entries        { list-style: none; margin: 0; padding: 0; }
-.entries li     { margin: 0.8em 1.2em; }
-.entries li h2  { margin-left: -1em; }
-.add-entry      { display: none; font-size: 0.9em; border-bottom: 1px solid #ccc; }
-.add-entry dl   { font-weight: bold; }
-.metanav        { text-align: right; font-size: 0.8em; padding: 0.3em;
-                  margin-bottom: 1em; background: #fafafa; }
-.flash          { background: #cee5F5; padding: 0.5em;
-                  border: 1px solid #aacbe2; }
-.hidden { display: none; }
-.error          { background: #f0d6d6; padding: 0.5em; }
-.currencies     { display: block; width: 50%; float: right; 
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}" />
+<style type=text/css>
+
+.currencies  { display: inline-block; width: 40%; float: right; 
                   list-style-type: none; padding: 0; font-family: monospace; 
                   margin: 0; padding-right: 3em; background-color:  #FFFFFF; font-size: 75%; text-align: right; }
 .currencies li  { display: inline; padding-left: 0.3em; padding-right: 0.3em; }
-#balance { display: none; font-family: monospace; }
+
+
+
+.balance li, .accounts li { list-style-type: none; margin: 0; padding: 0; }
 #income  { display: none; }
 table#incomes_table, table#transactions_table { 
   font-size:66%;
-  width:49%;
+  width:90%;
   display: inline-block;
   vertical-align: text-top;
 }
-
-#balance        {
-  width: 25%;
+#balance dl, #balance input { margin-left: 1em;}
+#balance, #accounts {
+  display: none;
+  font-family: monospace;
+  font-size: 66%;
   border-width: 2px;
   border-style: solid;
   border-color: green;
-  float: left;
+  width: 20%;  
   background-color:  #FFFFFF;
   margin-left: 3em;
 }
 </style>
 <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 <script src="//code.jquery.com/jquery-3.2.1.min.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script src="//code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script src="{{ url_for('static', filename='up.js') }}"></script>
 <!-- Latest compiled and minified CSS - >
 <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" />
 < ! -- Optional theme - >
@@ -66,32 +53,62 @@ $( document ).ready( function() {
   update_option('.period_selector', '/api/intervals');
   update_option('.currency_selector', '/api/currency');
   c_update('/api/currency');
-  get_balance(balance_url);
+  $('#balance input').change(function(event){
+    var a = {'start_date':'', 'end_date':''};
+    a[$(this).attr('name')] = $(this).val();
+    a[$(this).siblings('input').attr('name')] = $(this).siblings('input').val();
+    get_balance('/api/balance/0/'+a['start_date']+'/'+a['end_date']);
+  });
+  // get_balance(balance_url);
 });
 
-function update_option(element, url, title_fields=['title']){
+function get_balance(url){
+  $.getJSON('/api/currency', function(data){
+    c = [];
+    $.each(data, function(c_index, currency){
+      c.push('<dt>'+ currency['title'] +'</dt>')
+    });
+    c.push('<dt>TOTAL</dt>');
+    c.push('<dt>weeks</dt>');
+    c.push('<dt>weekly</dt>');
+    $('#balance dl').html(c.join(''));
+  });
+  $.getJSON(url, function(data){
+    
+    $.each(data, function(key, val){
+      $('#balance dt').each(function(){
+        if ($(this).text() == key) {
+          $(this).after('<dd>'+val+'</dd>');
+          // console.log($(this).text());
+        }
+      });
+      if (['start_date', 'end_date'].indexOf(key) > -1){
+        $('#balance input.'+key).val(val);
+      };
+    });
+  });
+  
+  
+  $('#balance').show();  
+}
+
+function json_names(in_json){
+  // {a: {b: {c: d}}} -> hash['a.b.c']=d
+}
+
+function get_accounts(url, title_fields=['title', 'currency.title']) {
   $.getJSON(url, function(data){
     var options = [];
     $.each(data, function(key, val){
       titles = []
       title_fields.forEach( function(t){ titles.push( (t=='title') ? val[t] : val[t]['title'])});
-      options.push('<option value="'+ val['id'] +'"'+ ((val['default']==1) ? " selected" : "") +'>'+ titles.join(' ') +'</option>')
+      options.push('<li>'+ titles.join(' ') +'</li>')
     });
-    $(element).html(options.join(''));
+    $('#accounts').html(options.join('')).show();
   })
+
 }
 
-function getDialogButton( dialog_selector, button_name ) {
-  var buttons = dialog_selector.find(' .ui-dialog-buttonpane button' );
-  for ( var i = 0; i < buttons.length; ++i ) {
-     var jButton = $( buttons[i] );
-     if ( jButton.text() == button_name )
-     {
-         return jButton;
-     }
-  }
-  return null;
-}
 
 function update_row(event, to_update, clean=false){
   var id, row;
@@ -105,7 +122,7 @@ function update_row(event, to_update, clean=false){
   row.find('.row_update').each(function(){
     var n , v;
     n = $(this).attr('name');
-    v = $(this).text();
+    v = $(this).text().trim();
     $('#' + to_update).find("[name='" + n + "']" ).each(function(){
       $(this).val( v )
     });
@@ -206,51 +223,11 @@ function update_row(event, to_update, clean=false){
 
 }
 
-function get_balance(url){
-  $.getJSON(url, function(data){
-    t = [];
-    $.each(data, function(key, val){
-      t.push('<li>' + key + ': ' + val + '</li>')
-    });
-    $('#balance').html(t.join("")).show();
-  })  
-}
 
-function delete_income(event) {
-  var id;
-  $('#income').hide();
-  id = $($(event.target).parents('tr').find('[name="id"]')[0]).text();
 
-  $.ajax({
-    type: "DELETE",
-    url: "/api/income/" + id,
-    data: "id=" + id,
-    success: function(msg){
-        // console.log("Data Deleted: " + msg);
-        $($(event.target).parents('tr')).remove();
-        get_balance(balance_url);
-    }
-  });
-  
-}
 
-function c_update(url){
-  if ($("#currency_refresh_img")) {
-    $("#currency_refresh").hide();
-  }
-  $.getJSON(url, function(data){
-    var items = [];
-    items.push("<li><span id='currency_refresh' class='ui-icon ui-icon-refresh' onClick='c_update(\"/update_rates\")'></span></li>");
-    $.each( data, function( key, val ) {
-      if (val["default"] == "0") {
-        items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );
-      }
-    });
-    get_balance(balance_url);
-    $("#currencies").html(items.join( "" ));
-    $("#currency_refresh").show();
-  })
-}
+
+
 $( function() {
     $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, setDate: new Date() });
   } );
@@ -259,22 +236,31 @@ $( function() {
 {% block js %}
 {% endblock %}
 <body>
-<ul id="currencies" class="currencies"></ul>
-<ul id="balance"  class="currencies">balance here</ul>
+
+
+<!--
+<div class=accounts>    
 <ul id="accounts"></ul>
+</div>
+-->
 
 <div class=page>
   <h1>E4</h1>
+  <div>
+    <ul id="currencies" class="currencies"></ul>
+    </div>
+
   <div class=metanav>
-  {% if not session.logged_in %}
-    <a href="{{ url_for('login') }}">log in</a>
-  {% else %}
-    <a href="{{ url_for('logout') }}">log out</a>
-  {% endif %}
-  </div>
+    {% if not session.logged_in %}
+      <a href="{{ url_for('login') }}">log in</a>
+    {% else %}
+      <a href="{{ url_for('logout') }}">log out</a>
+    {% endif %}
+    </div>
   {% for message in get_flashed_messages() %}
-    <div class=flash>{{ message }}</div>
+  <div class=flash>{{ message }}</div>
   {% endfor %}
+   
   {% block body %}{% endblock %}
 </div>
 </body>
