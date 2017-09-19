@@ -8,14 +8,14 @@ try:
 except ModuleNotFoundError:
     from utils import *
 from json import JSONEncoder
-from sqlalchemy import Column, DateTime, Date, String, Integer, Enum, Float, Text, ForeignKey, create_engine, func
+from sqlalchemy import Column, VARCHAR, DateTime, Date, String, Integer, Enum, Float, Text, ForeignKey, create_engine, func
 from sqlalchemy.orm import relationship, backref, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
 default_currency = 'ILS'
 Base = declarative_base()
-
+CURRENCY_SCALE=100000
 class Interval(Base):
     __tablename__ = 'intervals'
     id = Column(Integer, primary_key=True)
@@ -78,7 +78,7 @@ class Income(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')  # , back_populates='incomes')
-    sum = Column(Float)
+    sum = Column(VARCHAR)
     start_date = Column(Date)
     end_date = Column(Date, nullable=True)
     period_id = Column(Integer, ForeignKey('intervals.id'))
@@ -94,9 +94,9 @@ class Income(Base):
             'title': self.title,
             'currency_id': self.currency_id,
             'currency': self.currency.title,
-            'sum': self.sum,    
-            'start': self.start_date.isoformat(),
-            'end': (None if self.end_date == None else self.end_date.isoformat()),
+            'sum': float(int(self.sum)/CURRENCY_SCALE),
+            'start_date': self.start_date.isoformat(),
+            'end_date': (None if self.end_date == None else self.end_date.isoformat()),
             'period_id': self.period.id,
             'period': self.period.title
         }
@@ -112,13 +112,13 @@ class Income(Base):
         if _sd > _ed:
             return []
         if _sd == self.start_date:
-            s = self.sum
+            s = int(self.sum)
             list_dates.append((self.title, _sd, s, self.currency))
 
         nd = next_date(self.start_date, (self.period.value, self.period.item))
         while nd <= _ed:
             if nd >= _sd and nd <= _ed:
-                s += self.sum
+                s += int(self.sum)
                 list_dates.append((self.title, nd, s, self.currency))
             nd = next_date(nd, (self.period.value, self.period.item))
         return list_dates
@@ -136,16 +136,30 @@ class Account(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')
-    transactions = relationship('Transaction')  # , back_populates='account')
+    transactions = relationship('Transaction')
 
     def to_dict(self):
         return {
             'id': self.id,
             'title': self.title,
-            'currency': self.currency
+            'currency': self.currency,
+            'sum': int(self.sum())/CURRENCY_SCALE
         }
+
+    def sum(self):
+        try:
+            return DB.query(
+                Transaction.account_id,
+                func.sum(Transaction.sum).label('total')
+                ).filter(
+                    Transaction.account_id==self.id
+                    ).group_by(Transaction.account_id).first()[1]
+        except:
+            return "0"
+
     def __repr__(self):
         return "{:10s}".format(self.title)
+
 
 
 class Balance(object):
@@ -181,7 +195,7 @@ class Transaction(Base):
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")  # , back_populates='transactions')
-    sum = Column(Float, nullable=False)
+    sum = Column(VARCHAR, nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
@@ -194,14 +208,14 @@ class Transaction(Base):
             "id": self.id,
             "time": self.time.isoformat(),
             "account": self.account,
-            "sum": self.sum,
+            "sum": float(int(self.sum)/CURRENCY_SCALE),
             "transfer": self.transfer,
             "income": self.income,
             "comment": self.comment 
         }
 
     def __repr__(self):
-        return "{:6d} {} {} {:8.2f} {} {}".format(self.id, self.time, self.account,  self.sum, self.transfer, self.income)
+        return "{:6d} {} {} {} {} {}".format(self.id, self.time, self.account,  self.sum, self.transfer, self.income)
 
 
 engine = create_engine('sqlite:///e4/e4.db')
@@ -214,51 +228,4 @@ DB = session()
 
 
 if __name__ == '__main__':
-    import sys
-
-    a1 = Account(title='Cash More', currency_id=1)
-    a2 = Account(title='Cash', currency_id=1)
-    # s.add(a1)
-    # s.add(a2)
-    # print(s.query(Account).all())
-    a1 = DB.query(Account).get(1)
-    a2 = DB.query(Account).get(2)
-
-    # print(a1.id)
-    # print(a2.id)
-    # s.commit()
-    c1 = DB.query(Currency).get(1)
-    c2 = DB.query(Currency).filter_by(title='USD').first()
-    t1 = Transaction(time=datetime.now(), account=a1, sum=666, currency=c1)
-    t2 = Transaction(time=datetime.now(), account=a2, sum=-6666, currency=c2)
-    DB.add(t1)
-    DB.add(t2)
-    # print(s.query(Transaction.id).get(1))
-    DB.flush()
-    t1.transfer = t2.id
-    t2.transfer = t1.id
-
-    #print(t1.id, t2.id)
-    # s.commit()
-
-    for t in DB.query(Rate, func.max(Rate.rate_date)).group_by(Rate.currency_b).all():
-        print(t, t[0].currency_b)
-        
-
-    for t in DB.query(Currency).all():
-        print(t)
-    for t in DB.query(Income).all():
-        print(t.get_dates())
-        print(t.to_dict())
-    sys.exit()
-    for i in DB.query(Income).all():
-        print("----")
-        # print(i)
-        print(i.get_sum())
-        #print(i.get_dates(end_date=(datetime.strptime('2018-01-01', '%Y-%m-%d').date())))
-    # for i in s.query(Interval).all():
-    #    print(i)
-    # for i in s.query(Currency).all():
-    #    print(i)
-
     sys.exit()

@@ -8,14 +8,15 @@
 
 {% endblock %}<
 {% block body %}
-<div  style="border: 1px solid black; overflow: hidden;">
+<div  style="overflow: hidden;">
     <div id=balance style="width:15%; float: left;">
-      <dl></dl>
+      <dl class=balance></dl>
       <input name=start_date class="start_date datepicker" size=10>
       <input name=end_date class="end_date datepicker" size=10>
+      <dl class=accounts></dl>
       </div>
 
-    <div id=tabs style="width:80%; overflow: hidden;">
+    <div id=tabs style="width:70%; overflow: hidden;">
       <ul>
         <li><a href="#tab-incomes">incomes</a></li>
         <li><a href="#tab-transactions">transactions</a></li>
@@ -29,14 +30,14 @@
           <th>Currency</th>
           <th>Dates</th>
           <th>
-            <span href=# onclick="update_row(event, 'income', true); $('#income')[0].reset();" class="ui-icon ui-icon-document"></span>
+            <span href=# onclick=" $('#income')[0].reset(); update_row(event, 'income', true);" class="ui-icon ui-icon-document"></span>
             </th>
           </tr>
         
         {% for entry in entries %}
         <tr>
           <td>
-            <span class="hidden row_update" name=id >{{entry.id}}</span>
+            <span class="hidden row_update" name=id >{{entry['id']}}</span>
             <span class=row_update name=title>{{ entry.title|safe }}</span>
             </td>
           <td class=row_update name=sum>
@@ -47,12 +48,12 @@
             <span class="hidden row_update" name=currency_id>{{ entry.currency_id }}</span>
             </td>
           <td>  
-            {{ entry.period.title }}
+            {{ entry.period }}
             <span class="hidden row_update" name=period_id>{{ entry.period_id }}</span>
-              from <span name=start_date class=row_update> {{ entry.start_date.strftime('%Y-%m-%d') }}</span>
+              from <span name=start_date class=row_update> {{ entry.start_date }}</span>
               {% if entry.end_date %}
               <span > till </span>
-              <span class=row_update name=end_date>{{ entry.end_date.strftime('%Y-%m-%d') }}</span>
+              <span class=row_update name=end_date>{{ entry.end_date }}</span>
               {% endif %}
             </td>
           <td>
@@ -80,7 +81,7 @@
             <th>account</th>
             <th>comment</th>
             <th>
-              <span href=# onclick="update_row(event, 'transaction', true); $('#transaction')[0].reset();" class="ui-icon ui-icon-document"></span>
+              <span href=# onclick=" $('#transaction')[0].reset(); update_row(event, 'transaction', true);" class="ui-icon ui-icon-document"></span>
               </th>
             </tr>
           {% for entry in transactions %}
@@ -91,7 +92,7 @@
             <td class="hidden row_update" name=transfer>{{ entry.transfer }}</td>
             <td class="hidden row_update" name=income_id>{{ entry.income_id }}</td>
             <td>
-              <span class="hidden row_update" name=account_id>{{ entry.account_id }}</span>
+              <span class="hidden row_update" name=account_id>{{ entry.account.id }}</span>
               <span class=row_update name="account.title">{{ entry.account.title }}</span>
               (<span class=row_update name=account.currency.title>{{ entry.account.currency.title }}</span>)
               </td>
@@ -110,7 +111,7 @@
       <dt>Title</dt><dd><input type=text size=30 name=title class=form_save></dd>
       <dt>Currency</dt><dd><select name=currency_id class="form_save currency_selector"></select></dd>
       <dt>Summ</dt><dd><input name=sum size=11 class=form_save></dd>
-      <dt>Dates</dt><dd><input name=start_date size=11 class="form_save datepicker"> <input name=end_date size=11 class="form_save datepicker"></dd>
+      <dt>Dates</dt><dd><input name=start_date size=11 class="set_today form_save datepicker"> <input name=end_date size=11 class="form_save datepicker"></dd>
       <dt>Period</dt><dd><select name=period_id class="form_save period_selector"></select></dd>
       </dl>
    </form>
@@ -127,7 +128,7 @@
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
-      <dt>Time</dt><dd><input type=text size=30 name=time class="form_save datepicker"></dd>
+      <dt>Time</dt><dd><input type=text size=30 name=time class="set_today form_save datepicker"></dd>
       <dt>Account</dt><dd><select name=account_id class="form_save account_selector"></select></dd>
       <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
       <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>

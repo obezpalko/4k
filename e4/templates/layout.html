@@ -19,17 +19,20 @@ table#incomes_table, table#transactions_table {
   display: inline-block;
   vertical-align: text-top;
 }
-#balance dl, #balance input { margin-left: 1em;}
+#balance dl, #balance input { margin-left: 1em; font-size: 75%; }
 #balance, #accounts {
   display: none;
-  font-family: monospace;
-  font-size: 66%;
   border-width: 2px;
   border-style: solid;
   border-color: green;
   width: 20%;  
   background-color:  #FFFFFF;
   margin-left: 3em;
+}
+#balance dd {
+  font-family: monospace;
+  text-align: right;
+  margin-right: .5em;
 }
 </style>
 <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
@@ -71,7 +74,7 @@ function get_balance(url){
     c.push('<dt>TOTAL</dt>');
     c.push('<dt>weeks</dt>');
     c.push('<dt>weekly</dt>');
-    $('#balance dl').html(c.join(''));
+    $('#balance dl.balance').html(c.join(''));
   });
   $.getJSON(url, function(data){
     
@@ -87,7 +90,17 @@ function get_balance(url){
       };
     });
   });
-  
+  $.getJSON('/api/account', function(data){
+    c = []
+    $.each(data, function(k, v){
+      
+      //if (v['sum'] > 0 ) { 
+        c.push('<dt>'+v['title']+ ' ' + v['currency']['title'] +'</dt><dd>'+ v['sum'] +'</dd>');
+      //}
+    });
+    
+    $('#balance dl.accounts').html(c.join(''));
+  });
   
   $('#balance').show();  
 }
@@ -114,6 +127,9 @@ function update_row(event, to_update, clean=false){
   var id, row;
   id = $(event.target).parents('tr').find("[name=id]").text();
   row = $(event.target).parents('tr');
+  var today = new Date();
+  var date_today = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+  date_today = '2017-09-11';
   // var new_row = $(event.target).parents('tr').siblings().first().clone(true);
   var first_row = $(event.target).parents('tr').siblings().first();
   //header_row.before($(event.target).parents('tr').siblings()[0]);
@@ -127,7 +143,8 @@ function update_row(event, to_update, clean=false){
       $(this).val( v )
     });
   });
-  $('#' + to_update + " .datepicker").each(function(){$(this).datepicker({setDate: /*$(this).text()*/'2010-10-10'})});
+  
+  //$('#' + to_update + " .datepicker").each(function(){$(this).datepicker({setDate: /*$(this).text()*/'2010-10-10'})});
   var buttons=[];
   if (! clean) {
     buttons = [
@@ -182,11 +199,11 @@ function update_row(event, to_update, clean=false){
           $(this).dialog( "close" );
           get_balance(balance_url);
       }}
-    ]
+     ]
 
   } else {
     buttons = [
-    {text: 'Insert', click: function(){
+      {text: 'Insert', click: function(){
       var data={};
       $(this).dialog().find(".form_save").each(function(f, k){
         data[k.name] = k.value.replace(/^\s+|\s+$/g,'');
@@ -215,12 +232,19 @@ function update_row(event, to_update, clean=false){
 
       $(this).dialog( "close" );
       get_balance(balance_url);
-    }}
-    ]
+     }}
+     ]
   }
   
   $('#' + to_update).dialog({ buttons: buttons }).focus();
-
+  
+  $('#' + to_update).find('input.set_today').each(function(){
+    
+    $(this).datepicker("setDate", new Date());
+    console.log($(this).datepicker());
+    console.log($(this).val());
+  });
+ 
 }
 
 
@@ -229,7 +253,8 @@ function update_row(event, to_update, clean=false){
 
 
 $( function() {
-    $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, setDate: new Date() });
+    $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });
+
   } );
 
 </script>
