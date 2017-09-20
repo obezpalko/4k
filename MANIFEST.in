@@ -1,3 +1,2 @@
 graft e4/templates
 graft e4/static
-include e4/schema.sql
