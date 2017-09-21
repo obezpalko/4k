@@ -100,9 +100,27 @@ class Income(Base):
             'period_id': self.period.id,
             'period': self.period.title
         }
+
+    def get_backlog(self, max_date=date.today().replace(month=(date.today().month + 1))):
+        backlog=[]
+        (last_payment,) = DB.query(func.max(Transaction.time)).filter(Transaction.income_id==self.id).first()
+        if last_payment == None:
+            last_payment = self.start_date
+        else:
+            last_payment = last_payment + timedelta(1)
+        for d in self.get_dates(start_date=last_payment, end_date=max_date):
+            backlog.append({
+                'id': 0,
+                'time': d,
+                'sum': int(self.sum)/CURRENCY_SCALE,
+                'income': self,
+                'comment': ''
+                }) #Transaction(time=d, account_id=0, sum=self.sum, income_id=self.id, comment=self.title))
+        return backlog
+
     def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
         list_dates = []
-        s = 0
+        # s = 0
         _sd = max(start_date, self.start_date)
 
         if self.end_date:
@@ -113,21 +131,21 @@ class Income(Base):
             return []
         if _sd == self.start_date:
             s = int(self.sum)
-            list_dates.append((self.title, _sd, s, self.currency))
+            list_dates.append(_sd)
 
         nd = next_date(self.start_date, (self.period.value, self.period.item))
         while nd <= _ed:
             if nd >= _sd and nd <= _ed:
-                s += int(self.sum)
-                list_dates.append((self.title, nd, s, self.currency))
+                #s += int(self.sum)
+                list_dates.append(nd)
             nd = next_date(nd, (self.period.value, self.period.item))
         return list_dates
 
     def get_sum(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
         try:
-            return self.get_dates(start_date, end_date)[-1]
+            return len(self.get_dates(start_date, end_date))*int(self.sum)
         except IndexError:
-            return (self.title, None, 0, self.currency)
+            return 0
 
 
 class Account(Base):
@@ -179,13 +197,12 @@ class Balance(object):
         for c in self._get_currencies():
             t[c] = 0
         for i in self.incomes:
-            (name, st, bal, curr) = i.get_sum(start, end)
-            t[curr] += bal
-            if default_currency == curr:
-                t["_{}".format(default_currency)] += bal
+            b = i.get_sum(start, end)
+            t[curr] += b
+            if default_currency == i.currency:
+                t["_{}".format(default_currency)] += b
             else:
-                t["_{}".format(default_currency)] += bal * \
-                    self.current_rates[curr]
+                t["_{}".format(default_currency)] += b * self.current_rates[i.currency]
         return t
 
 

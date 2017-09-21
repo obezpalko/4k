@@ -13,7 +13,7 @@
 
 .balance li, .accounts li { list-style-type: none; margin: 0; padding: 0; }
 #income  { display: none; }
-table#incomes_table, table#transactions_table { 
+table.entries { 
   font-size:66%;
   width:90%;
   display: inline-block;
@@ -51,7 +51,9 @@ table#incomes_table, table#transactions_table {
 var balance_url;
 balance_url = '/api/balance/0/2017-12-31'
 $( document ).ready( function() { 
-
+  load_table('backlogs_table', '/api/backlog');
+  load_table('incomes_table', '/api/income');
+  load_table('transactions_table', '/api/transaction');
   update_option('.account_selector', '/api/account',['title', 'currency']);
   update_option('.period_selector', '/api/intervals');
   update_option('.currency_selector', '/api/currency');
@@ -64,6 +66,23 @@ $( document ).ready( function() {
   });
   // get_balance(balance_url);
 });
+
+function load_table(table_name, url){
+  $('#' + table_name + ' tr').not('.template').remove();
+  var template = $('#'+table_name).find('tr.template');
+  var new_row, n;
+  $.getJSON(url, function(data){
+    $.each(data, function(k, v){
+      new_row = template.clone(true).removeClass('template');
+      new_row.find('.row_update').each(function(){
+        $(this).text(json_names($(this).attr('name'), v));
+      });
+      template.after(new_row);
+      new_row.show();
+    });
+  });
+}
+
 
 function get_balance(url){
   $.getJSON('/api/currency', function(data){
@@ -82,7 +101,6 @@ function get_balance(url){
       $('#balance dt').each(function(){
         if ($(this).text() == key) {
           $(this).after('<dd>'+val+'</dd>');
-          // console.log($(this).text());
         }
       });
       if (['start_date', 'end_date'].indexOf(key) > -1){
@@ -103,11 +121,9 @@ function get_balance(url){
   });
   
   $('#balance').show();  
-}
+ }
 
-function json_names(in_json){
-  // {a: {b: {c: d}}} -> hash['a.b.c']=d
-}
+
 
 function get_accounts(url, title_fields=['title', 'currency.title']) {
   $.getJSON(url, function(data){
@@ -120,45 +136,52 @@ function get_accounts(url, title_fields=['title', 'currency.title']) {
     $('#accounts').html(options.join('')).show();
   })
 
-}
+ }
 
 
 function update_row(event, to_update, clean=false){
-  var id, row;
-  id = $(event.target).parents('tr').find("[name=id]").text();
-  row = $(event.target).parents('tr');
-  var today = new Date();
-  var date_today = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
-  date_today = '2017-09-11';
-  // var new_row = $(event.target).parents('tr').siblings().first().clone(true);
+  var id = $(event.target).parents('tr').find("[name=id]").text();
+  var row = $(event.target).parents('tr');
   var first_row = $(event.target).parents('tr').siblings().first();
-  //header_row.before($(event.target).parents('tr').siblings()[0]);
-  //$(event.target).parents('tr').siblings().first().before(new_row);
-  //console.log(header_row);
+  var buttons=[];
+  if (clean) {
+    $('form#'+to_update)[0].reset();
+    $('#'+to_update).find('input.set_today.datepicker').datepicker('setDate', new Date());
+   };
+  
+  
+
   row.find('.row_update').each(function(){
     var n , v;
     n = $(this).attr('name');
     v = $(this).text().trim();
     $('#' + to_update).find("[name='" + n + "']" ).each(function(){
       $(this).val( v )
-    });
-  });
+     });
+   });
   
-  //$('#' + to_update + " .datepicker").each(function(){$(this).datepicker({setDate: /*$(this).text()*/'2010-10-10'})});
-  var buttons=[];
+  
   if (! clean) {
     buttons = [
-      
       {text: 'Delete', click: function(){
+        var data={};
+        $(this).dialog().find(".form_save").each(function(f, k){
+          data[k.name] = k.value.replace(/^\s+|\s+$/g,'');
+        });
         $.ajax({
           type: "DELETE",
           url: "/api/" + to_update + "/" + id,
+          headers: { 
+              'Accept': 'application/json',
+              'Content-Type': 'application/json' 
+            },
+          dataType: 'json',
           //data: "id=" + id,
-          data: "",
+          data: JSON.stringify(data),
           success: function(msg){
             row.remove();
             get_balance(balance_url);
-          }
+           }
         });
         $(this).dialog( "close" );
       }},
@@ -179,20 +202,7 @@ function update_row(event, to_update, clean=false){
             success: function(data){
               updated=data['updated'];
               row.find('.row_update').each(function(){
-                n = $(this).attr('name');
-                if ( n != 'id') {
-                  sp = n.split('.');
-                  switch (sp.length) {
-                    case 2:
-                      $(this).text(updated[sp[0]][sp[1]]);
-                      break;
-                    case 3:
-                      $(this).text(updated[sp[0]][sp[1]][sp[2]]);
-                      break;
-                    default: 
-                      $(this).text(updated[n]);
-                  }
-                }
+                $(this).text(json_names($(this).attr('name'), updated))
               })
             }
           });
@@ -218,13 +228,12 @@ function update_row(event, to_update, clean=false){
         url: "/api/" + to_update ,
         data: JSON.stringify(data),
         success: function(data){
-          console.log(data);
           var new_row = first_row.clone(true);
           new_row.find('.row_update').each(function(){
-            n = $(this).attr('name');                
-            $(this).text(data[n]);
+            $(this).text(json_names($(this).attr('name'), data))
+            // n = $(this).attr('name');                
+            // $(this).text(data[n]);
           });
-          console.log(new_row);
           first_row.before(new_row);
         }
       });
@@ -240,9 +249,8 @@ function update_row(event, to_update, clean=false){
   
   $('#' + to_update).find('input.set_today').each(function(){
     
-    $(this).datepicker("setDate", new Date());
-    console.log($(this).datepicker());
-    console.log($(this).val());
+    // $(this).datepicker("setDate", new Date());
+
   });
  
 }

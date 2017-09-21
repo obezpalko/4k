@@ -61,9 +61,7 @@ def update_rates():
     for row in csv.reader(results.split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
         if len(row) < 1:
             continue
-        # print(default_currency, default_currency.id, default_currency.title)
-        # print(c_title[row[0].replace(
-        #    '{}=X'.format(default_currency.title), '')])
+
         objects.append(Rate(rate_date=datetime.datetime.strptime("{} {}".format(row[2], row[3]), "%m/%d/%Y %I:%M%p"),
                             currency_a=default_currency.id,
                             currency_b=c_title[row[0].replace(
@@ -185,19 +183,18 @@ def transaction_DELETE(*args, **kwargs):
 
 def transaction_GET(*args, **kwargs):
     """ load intervals from database """
-    return DB.query(Transaction).all() if kwargs['id'] == 0 else DB.query(Transaction).get(kwargs['id'])
+    return DB.query(Transaction).order_by(Transaction.time).all() if kwargs['id'] == 0 else DB.query(Transaction).order_by(Transaction.time).get(kwargs['id'])
 
 def transaction_POST(*args, **kwargs):
     id = kwargs['id']
     obj=json.loads(request.data.decode('utf-8', 'strict'))
-    print(obj)
     #try:    
     i=Transaction(
         time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
-        account_id=int(obj['account_id']),
+        account_id=int(obj['account.id']),
         sum=int(float(obj['sum'])*CURRENCY_SCALE),
         transfer=int(obj['transfer']),
-        income_id=int(obj['income_id']),
+        income_id=int(obj['income.id']),
         comment=obj['comment']
     )
     DB.add(i)
@@ -212,13 +209,12 @@ def transaction_PUT(*args, **kwargs):
     i = DB.query(Transaction).get(id)
 
     obj=json.loads(request.data.decode('utf-8', 'strict'))
-    print(obj)
     #try:
     i.time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date()
-    i.account_id=int(obj['account_id']) if obj['account_id'] != '' else None
+    i.account_id=int(obj['account.id']) if obj['account.id'] != '' else None
     i.sum=int(float(obj['sum'])*CURRENCY_SCALE)
     i.transfer=int(obj['transfer']) if obj['transfer'] not in ['0', ''] else None
-    i.income_id=int(obj['income_id']) if obj['income_id'] not in ['0', ''] else None
+    i.income_id=int(obj['income.id']) if obj['income.id'] not in ['0', ''] else None
     i.comment=obj['comment']
     #except:
     #    abort(400)
@@ -230,11 +226,11 @@ def balance_GET(*args, **kwargs):
     incomes = DB.query(Income).all()
     for i in incomes:
         s = i.get_sum(start_date=kwargs['start_date'],
-                      end_date=kwargs['end_date'])[2]
+                      end_date=kwargs['end_date'])
         try:
-            r[i.currency.title] += s/CURRENCY_SCALE
+            r[i.currency.title] += int(s)/CURRENCY_SCALE
         except KeyError:
-            r[i.currency.title] = s/CURRENCY_SCALE
+            r[i.currency.title] = int(s)/CURRENCY_SCALE
     total = 0
     for c in currency_GET():
         if c['title'] in r:
@@ -247,6 +243,41 @@ def balance_GET(*args, **kwargs):
     r['weekly'] = float('{:.2}'.format(total/w))
     return r
 
+def backlog_GET(*args, **kwargs):
+    results = []
+    for r in list(map(lambda x: x.get_backlog(), DB.query(Income).all())):
+        for b in r:
+            results.append(b)
+    return results
+
+def backlog_DELETE(*args, **kwargs):
+    # just create transaction with sum zero
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    t = Transaction(
+        time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
+        account_id=0,
+        sum=0,
+        income_id=obj['income.id'],
+        comment='cancelled')
+    DB.add(t)
+    DB.flush()
+    DB.commit()
+    return t
+
+def backlog_PUT(*args, **kwargs):
+    # actually insert transaction
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    t = Transaction(
+        time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
+        account_id=int(obj['account.id']),
+        sum=int(float(obj['sum'])*CURRENCY_SCALE),
+        income_id=obj['income.id'],
+        comment=obj['comment'])
+    DB.add(t)
+    DB.flush()
+    DB.commit()
+    return t
+    
 
 def intervals_GET(*args, **kwargs):
     """ load intervals from database """
@@ -281,6 +312,7 @@ def plan_GET(*args, **kwargs):
 
 
 
+
 s_date=datetime.date.today()
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
@@ -288,7 +320,6 @@ s_date=datetime.date.today()
 @app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date.isoformat()}, methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(*args, **kwargs):
-    # print(args, kwargs)
     try:
         start_date = datetime.datetime.strptime(kwargs['start_date'], '%Y-%m-%d').date()
     except:
