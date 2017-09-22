@@ -8,14 +8,14 @@ import http.client
 import json
 import csv
 from .utils import *
-from .income import  PRECISSION, DB, Currency, Rate, Income, Interval, Transaction, Account, CURRENCY_SCALE
+from .income import DB, Currency, Rate, Income, Interval, Transaction, Account
 import datetime
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func
 import decimal
-app = Flask(__name__) # create the application instance :)
-app.config.from_object(__name__) # load config from this file , flaskr.py
+app = Flask(__name__)  # create the application instance :)
+app.config.from_object(__name__)  # load config from this file , flaskr.py
 
 # Load default config and override config from an environment variable
 app.config.update(dict(
@@ -27,8 +27,7 @@ app.config.update(dict(
     SQLALCHEMY_DATABASE_URI='sqlite:///e4.db'
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
- 
-# decimal.getcontext().prec=PRECISSION
+
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -39,7 +38,7 @@ def json_serial(obj):
         return obj.to_dict()
     if isinstance(obj, decimal.Decimal):
         return format(obj.__str__())
-    raise TypeError("Type {} not serializable ({})".format( type(obj), obj))
+    raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
 
 
 @app.cli.command('rates')
@@ -59,7 +58,7 @@ def update_rates():
     param = []
     objects = []
     results = conn.getresponse().read().decode("utf-8", "strict")
-    
+
     for row in csv.reader(results.split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
         if len(row) < 1:
             continue
@@ -86,10 +85,12 @@ def update_rates():
 def show_incomes():
     # list(map(lambda x: x.to_dict() ,i))
     return render_template('show_entries.html',
-                           entries=list(map(lambda x: x.to_dict(), income_GET(id=0))),
+                           entries=list(
+                               map(lambda x: x.to_dict(), income_GET(id=0))),
                            currencies=currency_GET(id=0),
                            periods=intervals_GET(id=0),
-                           transactions=list(map(lambda x: x.to_dict(), transaction_GET(id=0)))
+                           transactions=list(
+                               map(lambda x: x.to_dict(), transaction_GET(id=0)))
                            )
 
 
@@ -129,19 +130,24 @@ def currency_GET(*args, **kwargs):
             entries.append(rate.to_dict())
     return entries
 
+
 def income_DELETE(*args, **kwargs):
     id = kwargs['id']
     income = DB.query(Income).filter_by(id=id).delete()
     DB.commit()
     return {'deleted': id}
 
+
 def income_GET(*args, **kwargs):
     return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
 
+
 incomes_GET = income_GET
+
 
 def account_GET(*args, **kwargs):
     return DB.query(Account).filter(Account.deleted == 'n').all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
+
 
 def account_DELETE(*args, **kwargs):
     id = kwargs['id']
@@ -152,68 +158,79 @@ def account_DELETE(*args, **kwargs):
     else:
         DB.query(Account).filter(Account.id == id).delete()
     DB.commit()
-    return {'deleted': id} 
+    return {'deleted': id}
+
 
 def account_POST(*args, **kwargs):
     id = kwargs['id']
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
-    a=Account(title=obj['title'],currency_id=int(obj['currency.id']))
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    a = Account(title=obj['title'], currency_id=int(obj['currency.id']))
     DB.add(a)
     DB.flush()
-    if (float(obj['sum'])>0):
-        DB.add(Transaction(account_id=a.id, show=obj['show'], comment='initial summ', time=date.today(), sum=obj['sum']))
+    if (float(obj['sum']) > 0):
+        DB.add(Transaction(account_id=a.id,
+                           show=obj['show'], comment='initial summ', time=date.today(), sum=obj['sum']))
     DB.commit()
     return a
+
 
 def account_PUT(*args, **kwargs):
     id = kwargs['id']
     a = DB.query(Account).get(id)
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
-    a.title=obj['title']
-    a.show=obj['show']
-    a.currency_id=obj['currency.id']
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    a.title = obj['title']
+    a.show = obj['show']
+    a.currency_id = obj['currency.id']
     delta_sum = decimal.Decimal(obj['sum']) - a.sum()
     if delta_sum != 0:
-        t = Transaction(time=date.today(), sum=delta_sum, account_id=id, comment='fix account summ')
+        t = Transaction(time=date.today(), sum=delta_sum,
+                        account_id=id, comment='fix account summ')
         DB.add(t)
     DB.commit()
     return {'updated': DB.query(Account).get(id), "previous": a}
 
+
 def income_POST(*args, **kwargs):
     id = kwargs['id']
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
-    #try:    
-    i=Income(
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    # try:
+    i = Income(
         title=obj['title'],
         currency_id=int(obj['currencyi.d']),
         sum=decimal.Decimal(obj['sum']),
-        start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date(),
-        end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date()),
+        start_date=datetime.datetime.strptime(
+            obj['start_date'], '%Y-%m-%d').date(),
+        end_date=(None if obj['end_date'] == '' else datetime.datetime.strptime(
+            obj['end_date'], '%Y-%m-%d').date()),
         period_id=int(obj['period.id'])
     )
     DB.add(i)
     DB.flush()
     DB.commit()
-    #except:
+    # except:
     #    abort(400)
     return i
+
 
 def income_PUT(*args, **kwargs):
     id = kwargs['id']
     i = DB.query(Income).get(id)
-    
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
-    #try:
-    i.title=obj['title']
-    i.currency_id=int(obj['currency.id'])
-    i.sum=decimal.Decimal(obj['sum'])
-    i.start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date()
-    i.end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date())
-    i.period_id=int(obj['period.id'])
-    #except:
+
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    # try:
+    i.title = obj['title']
+    i.currency_id = int(obj['currency.id'])
+    i.sum = decimal.Decimal(obj['sum'])
+    i.start_date = datetime.datetime.strptime(
+        obj['start_date'], '%Y-%m-%d').date()
+    i.end_date = (None if obj['end_date'] == '' else datetime.datetime.strptime(
+        obj['end_date'], '%Y-%m-%d').date())
+    i.period_id = int(obj['period.id'])
+    # except:
     #    abort(400)
     DB.commit()
     return {'updated': DB.query(Income).get(id), "previous": i}
+
 
 def transaction_DELETE(*args, **kwargs):
     id = kwargs['id']
@@ -221,16 +238,18 @@ def transaction_DELETE(*args, **kwargs):
     DB.commit()
     return {'deleted': id}
 
+
 def transaction_GET(*args, **kwargs):
     """ load intervals from database """
     return DB.query(Transaction).order_by(Transaction.time).all() if kwargs['id'] == 0 else DB.query(Transaction).order_by(Transaction.time).get(kwargs['id'])
 
+
 def transaction_POST(*args, **kwargs):
     id = kwargs['id']
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
-    #try:    
-    i=Transaction(
-        time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    # try:
+    i = Transaction(
+        time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
         account_id=int(obj['account.id']),
         sum=decimal.Decimal(obj['sum']),
         transfer=int(obj['transfer']),
@@ -240,31 +259,35 @@ def transaction_POST(*args, **kwargs):
     DB.add(i)
     DB.flush()
     DB.commit()
-    #except:
+    # except:
     #    abort(400)
     return i
+
 
 def transaction_PUT(*args, **kwargs):
     id = kwargs['id']
     i = DB.query(Transaction).get(id)
 
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
-    #try:
-    i.time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date()
-    i.account_id=int(obj['account.id']) if obj['account.id'] != '' else None
-    i.sum=decimal.Decimal(obj['sum'])
-    i.transfer=int(obj['transfer']) if obj['transfer'] not in ['0', ''] else None
-    i.income_id=int(obj['income.id']) if obj['income.id'] not in ['0', ''] else None
-    i.comment=obj['comment']
-    #except:
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    # try:
+    i.time = datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date()
+    i.account_id = int(obj['account.id']) if obj['account.id'] != '' else None
+    i.sum = decimal.Decimal(obj['sum'])
+    i.transfer = int(obj['transfer']) if obj['transfer'] not in [
+        '0', ''] else None
+    i.income_id = int(obj['income.id']) if obj['income.id'] not in [
+        '0', ''] else None
+    i.comment = obj['comment']
+    # except:
     #    abort(400)
     DB.commit()
     return {'updated': DB.query(Transaction).get(id), "previous": i}
 
+
 def balance_GET(*args, **kwargs):
     r = {}
     incomes = DB.query(Income).all()
-    
+
     for i in incomes:
         s = i.get_sum(start_date=kwargs['start_date'],
                       end_date=kwargs['end_date'])
@@ -280,10 +303,12 @@ def balance_GET(*args, **kwargs):
     r['TOTAL'] = total
     r['start_date'] = kwargs['start_date']
     r['end_date'] = kwargs['end_date']
-    w = number_of_weeks(kwargs['start_date'].strftime('%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
+    w = number_of_weeks(kwargs['start_date'].strftime(
+        '%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
     r['weeks'] = w
-    r['weekly'] = r['TOTAL']//w
+    r['weekly'] = r['TOTAL'] // w
     return r
+
 
 def backlog_GET(*args, **kwargs):
     results = []
@@ -292,11 +317,12 @@ def backlog_GET(*args, **kwargs):
             results.append(b)
     return results
 
+
 def backlog_DELETE(*args, **kwargs):
     # just create transaction with sum zero
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
     t = Transaction(
-        time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
+        time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
         account_id=0,
         sum=0,
         income_id=obj['income.id'],
@@ -306,27 +332,25 @@ def backlog_DELETE(*args, **kwargs):
     DB.commit()
     return t
 
+
 def backlog_PUT(*args, **kwargs):
     # actually insert transaction
-    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
     t = Transaction(
-        time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
+        time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
         account_id=int(obj['account.id']),
-        sum=int(float(obj['sum'])*CURRENCY_SCALE),
+        sum=obj['sum'],
         income_id=obj['income.id'],
         comment=obj['comment'])
     DB.add(t)
     DB.flush()
     DB.commit()
     return t
-    
+
 
 def intervals_GET(*args, **kwargs):
     """ load intervals from database """
     return DB.query(Interval).all() if kwargs['id'] == 0 else DB.query(Interval).get(kwargs['id'])
-
-
-
 
 
 def plan_GET(*args, **kwargs):
@@ -349,24 +373,25 @@ def plan_GET(*args, **kwargs):
             }
 
 
+s_date = datetime.date.today()
 
 
-
-
-s_date=datetime.date.today()
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
-@app.route('/api/<string:api>/<int:id>', defaults={'end_date': s_date.replace(year=(s_date.year+1))}, methods=['GET', 'DELETE', 'PUT'])
+@app.route('/api/<string:api>/<int:id>', defaults={'end_date': s_date.replace(year=(s_date.year + 1))}, methods=['GET', 'DELETE', 'PUT'])
 @app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date.isoformat()}, methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(*args, **kwargs):
     try:
-        start_date = datetime.datetime.strptime(kwargs['start_date'], '%Y-%m-%d').date()
+        start_date = datetime.datetime.strptime(
+            kwargs['start_date'], '%Y-%m-%d').date()
     except:
         start_date = datetime.date.today()
     try:
-        end_date = datetime.datetime.strptime(kwargs['end_date'], '%Y-%m-%d').date()
+        end_date = datetime.datetime.strptime(
+            kwargs['end_date'], '%Y-%m-%d').date()
     except:
-        end_date = datetime.datetime.now().replace(year=datetime.datetime.now().year+1).date()
+        end_date = datetime.datetime.now().replace(
+            year=datetime.datetime.now().year + 1).date()
     kwargs.update({'start_date': start_date, 'end_date': end_date})
     return json.dumps(globals()["{}_{}".format(kwargs['api'], request.method)](*args, **kwargs), default=json_serial)

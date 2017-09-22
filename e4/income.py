@@ -17,19 +17,24 @@ import sqlalchemy.types as types
 
 default_currency = 'ILS'
 Base = declarative_base()
-CURRENCY_SCALE=100000
 PRECISSION = decimal.Decimal(10) ** -2
 
 
 class SqliteNumeric(types.TypeDecorator):
     impl = types.String
+
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(types.VARCHAR(100))
+
     def process_bind_param(self, value, dialect):
         return str(value)
+
     def process_result_value(self, value, dialect):
         return decimal.Decimal(value)
+
+
 Numeric = SqliteNumeric
+
 
 class Interval(Base):
     __tablename__ = 'intervals'
@@ -40,7 +45,7 @@ class Interval(Base):
 
     def __repr__(self):
         return "{}:{}{}".format(self.title, self.value, self.item)
-    
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -48,6 +53,7 @@ class Interval(Base):
             "item": self.item,
             "value": self.value
         }
+
 
 class Rate(Base):
     __tablename__ = 'rates'
@@ -73,6 +79,7 @@ class Rate(Base):
             "default": self.b.default
         }
 
+
 class Currency(Base):
     __tablename__ = 'currency'
     id = Column(Integer, primary_key=True)
@@ -82,7 +89,7 @@ class Currency(Base):
     # rate = relationship("Rate")
 
     def _rate(self):
-        return DB.query(Rate).filter(Rate.currency_b==self.id).order_by(Rate.rate_date.desc()).first()
+        return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(Rate.rate_date.desc()).first()
 
     def __repr__(self):
         return "{}".format(self.title)
@@ -94,7 +101,7 @@ class Currency(Base):
             'name': self.name,
             'rate': self._rate(),
             'default': self.default
-            }
+        }
 
 
 class Income(Base):
@@ -103,16 +110,15 @@ class Income(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')  # , back_populates='incomes')
-    sum = Column(Numeric(12,2))
+    sum = Column(Numeric(12, 2))
     start_date = Column(Date)
     end_date = Column(Date, nullable=True)
     period_id = Column(Integer, ForeignKey('intervals.id'))
     period = relationship('Interval')  # , back_populates='incomes')
 
-
     def __repr__(self):
         return "{:20s} {}".format(self.title, self.currency)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -125,8 +131,9 @@ class Income(Base):
         }
 
     def get_backlog(self, max_date=date.today().replace(month=(date.today().month + 1))):
-        backlog=[]
-        (last_payment,) = DB.query(func.max(Transaction.time)).filter(Transaction.income_id==self.id).first()
+        backlog = []
+        (last_payment,) = DB.query(func.max(Transaction.time)).filter(
+            Transaction.income_id == self.id).first()
         if last_payment == None:
             last_payment = self.start_date
         else:
@@ -138,7 +145,7 @@ class Income(Base):
                 'sum': self.sum,
                 'income': self,
                 'comment': ''
-                }) #Transaction(time=d, account_id=0, sum=self.sum, income_id=self.id, comment=self.title))
+            })  # Transaction(time=d, account_id=0, sum=self.sum, income_id=self.id, comment=self.title))
         return backlog
 
     def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
@@ -166,7 +173,7 @@ class Income(Base):
 
     def get_sum(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
         try:
-            return len(self.get_dates(start_date, end_date))*int(self.sum)
+            return len(self.get_dates(start_date, end_date)) * int(self.sum)
         except IndexError:
             return 0
 
@@ -178,11 +185,11 @@ class Account(Base):
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')
     transactions = relationship('Transaction', cascade="all, delete-orphan")
-    deleted = Column(Enum('y','n'), default='n')
-    show = Column(Enum('y','n'), default='y')
+    deleted = Column(Enum('y', 'n'), default='n')
+    show = Column(Enum('y', 'n'), default='y')
 
     def to_dict(self):
-        #decimal.getcontext().prec=PRECISSION
+        # decimal.getcontext().prec=PRECISSION
         return {
             'id': self.id,
             'title': self.title,
@@ -193,20 +200,19 @@ class Account(Base):
         }
 
     def sum(self):
-        #return func.sum(Transaction.sum)
+        # return func.sum(Transaction.sum)
         try:
             return decimal.Decimal(DB.query(
                 Transaction.account_id,
                 func.sum(Transaction.sum).label('total')
-                ).filter(
-                    Transaction.account_id==self.id
-                    ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
+            ).filter(
+                Transaction.account_id == self.id
+            ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
         except:
             return decimal.Decimal(0)
 
     def __repr__(self):
         return "{:10s}".format(self.title)
-
 
 
 class Balance(object):
@@ -231,7 +237,8 @@ class Balance(object):
             if default_currency == i.currency:
                 t["_{}".format(default_currency)] += b
             else:
-                t["_{}".format(default_currency)] += b * self.current_rates[i.currency]
+                t["_{}".format(default_currency)] += b * \
+                    self.current_rates[i.currency]
         return t
 
 
@@ -241,13 +248,12 @@ class Transaction(Base):
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")
-    sum = Column(Numeric(12,2), nullable=False)
+    sum = Column(Numeric(12, 2), nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
     income = relationship("Income")  # , back_populates='transactions')
     comment = Column(Text)
-
 
     def to_dict(self):
         return {
@@ -257,11 +263,24 @@ class Transaction(Base):
             "sum": self.sum,
             "transfer": self.transfer,
             "income": self.income,
-            "comment": self.comment 
+            "comment": self.comment
         }
 
     def __repr__(self):
         return "{:6d} {} {} {} {} {}".format(self.id, self.time, self.account,  self.sum, self.transfer, self.income)
+
+
+class Payforward(Base):
+    __tablename__ = 'payforwards'
+    id = Column(Integer, primary_key=True)
+    income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
+    income = relationship("Income")  # , back_populates='transactions')
+    income_date = Column(Date, nullable=False)
+    payment_date = Column(Date, nullable=False)
+    transaction_id = Column(Integer, ForeignKey(
+        'transactions.id'), nullable=False)
+    transaction = relationship("Transaction")
+
 
 
 engine = create_engine('sqlite:///e4/e4.db')
