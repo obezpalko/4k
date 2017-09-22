@@ -16,6 +16,16 @@ from sqlalchemy.ext.declarative import declarative_base
 default_currency = 'ILS'
 Base = declarative_base()
 CURRENCY_SCALE=100000
+
+def str2int(s):
+    a = s.split('.')
+    if len(a) < 2:
+        return int(s+'00000')
+    return int(a[0]+(a[1]+'00000')[:5])
+
+def int2str(s):
+    return s[:-5]+'.'+s[-5:-4]+(s[-4:].rstrip('0'))
+
 class Interval(Base):
     __tablename__ = 'intervals'
     id = Column(Integer, primary_key=True)
@@ -92,13 +102,11 @@ class Income(Base):
         return {
             'id': self.id,
             'title': self.title,
-            'currency_id': self.currency_id,
-            'currency': self.currency.title,
-            'sum': float(int(self.sum)/CURRENCY_SCALE),
+            'currency': self.currency,
+            'sum': int2str(self.sum),
             'start_date': self.start_date.isoformat(),
             'end_date': (None if self.end_date == None else self.end_date.isoformat()),
-            'period_id': self.period.id,
-            'period': self.period.title
+            'period': self.period
         }
 
     def get_backlog(self, max_date=date.today().replace(month=(date.today().month + 1))):
@@ -112,7 +120,7 @@ class Income(Base):
             backlog.append({
                 'id': 0,
                 'time': d,
-                'sum': int(self.sum)/CURRENCY_SCALE,
+                'sum': int2str(self.sum),
                 'income': self,
                 'comment': ''
                 }) #Transaction(time=d, account_id=0, sum=self.sum, income_id=self.id, comment=self.title))
@@ -154,24 +162,29 @@ class Account(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')
-    transactions = relationship('Transaction')
+    transactions = relationship('Transaction', cascade="all, delete-orphan")
+    deleted = Column(Enum('y','n'), default='n')
+    show = Column(Enum('y','n'), default='y')
 
     def to_dict(self):
         return {
             'id': self.id,
             'title': self.title,
             'currency': self.currency,
-            'sum': int(self.sum())/CURRENCY_SCALE
+            'sum': int2str("{}".format(self.sum())),
+            'show': self.show,
+            'deleted': self.deleted
         }
 
     def sum(self):
+        #return func.sum(Transaction.sum)
         try:
-            return DB.query(
+            return int(DB.query(
                 Transaction.account_id,
                 func.sum(Transaction.sum).label('total')
                 ).filter(
                     Transaction.account_id==self.id
-                    ).group_by(Transaction.account_id).first()[1]
+                    ).group_by(Transaction.account_id).first()[1])
         except:
             return "0"
 
@@ -211,7 +224,7 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True)
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
-    account = relationship("Account")  # , back_populates='transactions')
+    account = relationship("Account")
     sum = Column(VARCHAR, nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation
@@ -225,7 +238,7 @@ class Transaction(Base):
             "id": self.id,
             "time": self.time.isoformat(),
             "account": self.account,
-            "sum": float(int(self.sum)/CURRENCY_SCALE),
+            "sum": int2str(self.sum),
             "transfer": self.transfer,
             "income": self.income,
             "comment": self.comment 

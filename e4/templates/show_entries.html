@@ -6,7 +6,7 @@
   } );
   </script>
 
-{% endblock %}<
+{% endblock %}
 {% block body %}
 <div  style="overflow: hidden;">
     <div id=balance style="width:15%; float: left;">
@@ -21,13 +21,39 @@
         <li><a href="#tab-backlog">backlog</a></li>
         <li><a href="#tab-incomes">incomes</a></li>
         <li><a href="#tab-transactions">transactions</a></li>
+        <li><a href="#tab-accounts">accounts</a></li>
        </ul>
+      <div id=tab-accounts>
+          <table class=entries id=accounts_table>
+              <tr class=table_header>
+                  <th class="hidden">id</th>
+                  <th>title</th>
+                  <th>currency</th>
+                  <th>sum</th>
+                  <th>
+                    <span onclick="update_row(event, 'account', true);" class="ui-icon ui-icon-document"></span>
+                    </th>
+                  
+                </tr>
+              <tr class="template hidden">
+                  <td class="hidden row_update" name=id></td>
+                  <td class=row_update name=title></td>
+                  <td ><span class="hidden row_update" name=currency.id></span> <span class=row_update name=currency.title></span></td>
+                  <td class=row_update name=sum></td>
+                  <td>
+                    <span class="hidden row_update" name=show ></span>
+                    <span onclick="update_row(event, 'account');" class="ui-icon ui-icon-pencil"></span>
+                    </td>
+                </tr>
+          </table>
+      </div>
       <div id=tab-backlog >
           <table class=entries id=backlogs_table>
-              <tr>
+              <tr class=table_header>
                   <th class="hidden">id</th>
                   <th>time</th>
                   <th>sum</th>
+                  <th>currency</th>
                   <th class=hidden>transfer</th>
                   <th class=hidden>income_id</th>
                   <th>income</th>
@@ -39,7 +65,8 @@
                   <tr class="template hidden">
                       <td class="hidden row_update" name=id></td>
                       <td class=row_update name=time></td>
-                      <td ><span class=row_update name=sum></span> <span class=row_update name=income.currency></span></td>
+                      <td class=row_update name=sum></td>
+                      <td class=row_update name=income.currency.title></td>
                       <td class="hidden row_update" name=income.id></td>
                       <td><span class=row_update name=income.title></span></td>
                       <td class=row_update name=comment></td>
@@ -51,7 +78,7 @@
         </div>
       <div id="tab-incomes">
         <table class=entries id=incomes_table>
-        <tr>
+        <tr class=table_header>
           <th>Title</th>
           <th>Summ</th>
           <th>Currency</th>
@@ -67,12 +94,12 @@
             </td>
           <td class=row_update name=sum></td>
           <td>
-            <span name=currency class="row_update"></span>
-            <span class="hidden row_update" name=currency_id></span>
+            <span class="row_update" name=currency.title></span>
+            <span class="hidden row_update" name=currency.id></span>
             </td>
           <td>  
-            <span class="row_update" name=period> </span>
-            <span class="hidden row_update" name=period_id> </span>
+            <span class="row_update" name=period.title> </span>
+            <span class="hidden row_update" name=period.id> </span>
             <span name=start_date class=row_update> from </span>
             <span class=row_update name=end_date>till</span>
             </td>
@@ -86,7 +113,7 @@
 
       <div id="tab-transactions">
         <table  class=entries id=transactions_table>
-          <tr>
+          <tr class=table_header>
             <th class="hidden">id</th>
             <th>time</th>
             <th>sum</th>
@@ -94,6 +121,7 @@
             <th class=hidden>income_id</th>
             <th>account</th>
             <th>comment</th>
+            <th>income</th>
             <th>
               <span href=# onclick="update_row(event, 'transaction', true);" class="ui-icon ui-icon-document"></span>
               </th>
@@ -110,6 +138,7 @@
                   (<span class=row_update name=account.currency.title></span>)
                   </td>
                 <td class=row_update name=comment></td>
+                <td class=row_update name=income.title></td>
                 <td><span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span></td>
                 </tr>
 
@@ -122,18 +151,20 @@
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Title</dt><dd><input type=text size=30 name=title class=form_save></dd>
-      <dt>Currency</dt><dd><select name=currency_id class="form_save currency_selector"></select></dd>
+      <dt>Currency</dt><dd><select name=currency.id class="form_save currency_selector"></select></dd>
       <dt>Summ</dt><dd><input name=sum size=11 class=form_save></dd>
       <dt>Dates</dt><dd><input name=start_date size=11 class="set_today form_save datepicker"> <input name=end_date size=11 class="form_save datepicker"></dd>
-      <dt>Period</dt><dd><select name=period_id class="form_save period_selector"></select></dd>
+      <dt>Period</dt><dd><select name=period.id class="form_save period_selector"></select></dd>
       </dl>
    </form>
 
   <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="account">
       <dl>
         <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
-        <dt>Title</dt><dd><input type=text size=30 name=title class="title" value=""></dd>
-        <dt>Currency</dt><dd><select name=currency class="currency currency_selector"></select></dd>
+        <dt>Title</dt><dd><input type=text size=30 name=title class=form_save value=""></dd>
+        <dt>Currency</dt><dd><select name=currency.id class="currency currency_selector form_save"></select></dd>
+        <dt>Visible</dt><dd><input name=show class=form_save size=1></dd>
+        <dt>Summ</dt><dd><input name=sum class=form_save size=10></dd>
         </dl>
     </form>
   

@@ -15,7 +15,7 @@
 #income  { display: none; }
 table.entries { 
   font-size:66%;
-  width:90%;
+  width:100%;
   display: inline-block;
   vertical-align: text-top;
 }
@@ -50,10 +50,16 @@ table.entries {
 //$( document ).ready(function() { c_update('/api/currency') ; get_balance() });
 var balance_url;
 balance_url = '/api/balance/0/2017-12-31'
-$( document ).ready( function() { 
+
+function reload_all() {
   load_table('backlogs_table', '/api/backlog');
   load_table('incomes_table', '/api/income');
   load_table('transactions_table', '/api/transaction');
+  load_table('accounts_table', '/api/account');
+}
+
+$( document ).ready( function() { 
+  reload_all();
   update_option('.account_selector', '/api/account',['title', 'currency']);
   update_option('.period_selector', '/api/intervals');
   update_option('.currency_selector', '/api/currency');
@@ -68,11 +74,12 @@ $( document ).ready( function() {
 });
 
 function load_table(table_name, url){
-  $('#' + table_name + ' tr').not('.template').remove();
+  $('#' + table_name + ' tr').not('.template').not('.table_header').remove();
   var template = $('#'+table_name).find('tr.template');
   var new_row, n;
   $.getJSON(url, function(data){
     $.each(data, function(k, v){
+      if (v['deleted']=='y') {return false;}
       new_row = template.clone(true).removeClass('template');
       new_row.find('.row_update').each(function(){
         $(this).text(json_names($(this).attr('name'), v));
@@ -111,10 +118,9 @@ function get_balance(url){
   $.getJSON('/api/account', function(data){
     c = []
     $.each(data, function(k, v){
-      
-      //if (v['sum'] > 0 ) { 
+      if (v['show'] == 'y'  ) { 
         c.push('<dt>'+v['title']+ ' ' + v['currency']['title'] +'</dt><dd>'+ v['sum'] +'</dd>');
-      //}
+      }
     });
     
     $('#balance dl.accounts').html(c.join(''));
@@ -142,7 +148,8 @@ function get_accounts(url, title_fields=['title', 'currency.title']) {
 function update_row(event, to_update, clean=false){
   var id = $(event.target).parents('tr').find("[name=id]").text();
   var row = $(event.target).parents('tr');
-  var first_row = $(event.target).parents('tr').siblings().first();
+  var template = $(event.target).parents('table').find('tr.template');
+  // var first_row = $(event.target).parents('tr').siblings().first();
   var buttons=[];
   if (clean) {
     $('form#'+to_update)[0].reset();
@@ -181,6 +188,8 @@ function update_row(event, to_update, clean=false){
           success: function(msg){
             row.remove();
             get_balance(balance_url);
+            reload_all();
+            
            }
         });
         $(this).dialog( "close" );
@@ -203,11 +212,14 @@ function update_row(event, to_update, clean=false){
               updated=data['updated'];
               row.find('.row_update').each(function(){
                 $(this).text(json_names($(this).attr('name'), updated))
-              })
+              });
+              
+              get_balance(balance_url);
+              reload_all();
+              
             }
           });
           $(this).dialog( "close" );
-          get_balance(balance_url);
       }}
      ]
 
@@ -228,37 +240,26 @@ function update_row(event, to_update, clean=false){
         url: "/api/" + to_update ,
         data: JSON.stringify(data),
         success: function(data){
-          var new_row = first_row.clone(true);
+          var new_row=template.clone(true);
+          
           new_row.find('.row_update').each(function(){
             $(this).text(json_names($(this).attr('name'), data))
-            // n = $(this).attr('name');                
-            // $(this).text(data[n]);
-          });
-          first_row.before(new_row);
+          }).removeClass('template').insertAfter(template).show();
+          
+          get_balance(balance_url);
+          reload_all();
         }
       });
-      
-
       $(this).dialog( "close" );
-      get_balance(balance_url);
+
      }}
      ]
   }
   
   $('#' + to_update).dialog({ buttons: buttons }).focus();
   
-  $('#' + to_update).find('input.set_today').each(function(){
-    
-    // $(this).datepicker("setDate", new Date());
 
-  });
- 
 }
-
-
-
-
-
 
 $( function() {
     $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });

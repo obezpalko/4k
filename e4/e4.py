@@ -8,7 +8,7 @@ import http.client
 import json
 import csv
 from .utils import *
-from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, CURRENCY_SCALE
+from .income import str2int, int2str, DB, Currency, Rate, Income, Interval, Transaction, Account, CURRENCY_SCALE
 import datetime
 
 from sqlalchemy.orm import sessionmaker
@@ -134,10 +134,49 @@ def income_DELETE(*args, **kwargs):
     return {'deleted': id}
 
 def income_GET(*args, **kwargs):
-    data = DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
-    return data
+    return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
 
 incomes_GET = income_GET
+
+def account_GET(*args, **kwargs):
+    return DB.query(Account).filter(Account.deleted == 'n').all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
+
+def account_DELETE(*args, **kwargs):
+    id = kwargs['id']
+    income = DB.query(Account).get(id)
+    if DB.query(Transaction).filter(Transaction.account_id == id).count() > 0:
+        income.deleted = 'y'
+        income.show = 'n'
+    else:
+        DB.query(Account).filter(Account.id == id).delete()
+    DB.commit()
+    return {'deleted': id} 
+
+def account_POST(*args, **kwargs):
+    id = kwargs['id']
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    a=Account(title=obj['title'],currency_id=int(obj['currency.id']))
+    DB.add(a)
+    DB.flush()
+    if (float(obj['sum'])>0):
+        DB.add(Transaction(account_id=a.id, comment='initial summ', time=date.today(),
+            sum=int(float(obj['sum'])*CURRENCY_SCALE)))
+    DB.commit()
+    return a
+
+def account_PUT(*args, **kwargs):
+    id = kwargs['id']
+    a = DB.query(Account).get(id)
+    obj=json.loads(request.data.decode('utf-8', 'strict'))
+    a.title=obj['title']
+    a.show=obj['show']
+    a.currency_id=obj['currency.id']
+    delta_sum = int(str2int(obj['sum'])) - int(a.sum())
+    if delta_sum != 0:
+        t = Transaction(time=date.today(), sum=delta_sum, account_id=id, comment='fix account summ')
+        DB.add(t)
+    DB.commit()
+    return {'updated': DB.query(Account).get(id), "previous": a}
 
 def income_POST(*args, **kwargs):
     id = kwargs['id']
@@ -145,11 +184,11 @@ def income_POST(*args, **kwargs):
     #try:    
     i=Income(
         title=obj['title'],
-        currency_id=int(obj['currency_id']),
-        sum=int(float(obj['sum'])*CURRENCY_SCALE),
+        currency_id=int(obj['currencyi.d']),
+        sum=str2int(obj['sum']),
         start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date(),
         end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date()),
-        period_id=int(obj['period_id'])
+        period_id=int(obj['period.id'])
     )
     DB.add(i)
     DB.flush()
@@ -165,11 +204,11 @@ def income_PUT(*args, **kwargs):
     obj=json.loads(request.data.decode('utf-8', 'strict'))
     #try:
     i.title=obj['title']
-    i.currency_id=int(obj['currency_id'])
-    i.sum=int(float(obj['sum'])*CURRENCY_SCALE)
+    i.currency_id=int(obj['currency.id'])
+    i.sum=str2int(obj['sum'])
     i.start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date()
     i.end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date())
-    i.period_id=int(obj['period_id'])
+    i.period_id=int(obj['period.id'])
     #except:
     #    abort(400)
     DB.commit()
@@ -192,7 +231,7 @@ def transaction_POST(*args, **kwargs):
     i=Transaction(
         time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
         account_id=int(obj['account.id']),
-        sum=int(float(obj['sum'])*CURRENCY_SCALE),
+        sum=str2int(obj['sum']),
         transfer=int(obj['transfer']),
         income_id=int(obj['income.id']),
         comment=obj['comment']
@@ -212,7 +251,7 @@ def transaction_PUT(*args, **kwargs):
     #try:
     i.time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date()
     i.account_id=int(obj['account.id']) if obj['account.id'] != '' else None
-    i.sum=int(float(obj['sum'])*CURRENCY_SCALE)
+    i.sum=str2int(obj['sum'])
     i.transfer=int(obj['transfer']) if obj['transfer'] not in ['0', ''] else None
     i.income_id=int(obj['income.id']) if obj['income.id'] not in ['0', ''] else None
     i.comment=obj['comment']
@@ -228,19 +267,20 @@ def balance_GET(*args, **kwargs):
         s = i.get_sum(start_date=kwargs['start_date'],
                       end_date=kwargs['end_date'])
         try:
-            r[i.currency.title] += int(s)/CURRENCY_SCALE
+            r[i.currency.title] += s
         except KeyError:
-            r[i.currency.title] = int(s)/CURRENCY_SCALE
+            r[i.currency.title] = s
     total = 0
     for c in currency_GET():
         if c['title'] in r:
-            total += c['rate'] * r[c['title']]
-    r['TOTAL'] = '{:.2f}'.format(total)
+            total += int(c['rate'] * r[c['title']])
+            r[c['title']] = int2str("{}".format(r[c['title']]))
+    r['TOTAL'] = int2str("{}".format(total))
     r['start_date'] = kwargs['start_date']
     r['end_date'] = kwargs['end_date']
     w = number_of_weeks(kwargs['start_date'].strftime('%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
     r['weeks'] = w
-    r['weekly'] = float('{:.2}'.format(total/w))
+    r['weekly'] = float(r['TOTAL'])//w
     return r
 
 def backlog_GET(*args, **kwargs):
@@ -284,9 +324,7 @@ def intervals_GET(*args, **kwargs):
     return DB.query(Interval).all() if kwargs['id'] == 0 else DB.query(Interval).get(kwargs['id'])
 
 
-def account_GET(*args, **kwargs):
-    """ load intervals from database """
-    return DB.query(Account).all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
+
 
 
 def plan_GET(*args, **kwargs):
