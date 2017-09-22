@@ -8,23 +8,28 @@ try:
 except ModuleNotFoundError:
     from utils import *
 from json import JSONEncoder
-from sqlalchemy import Column, VARCHAR, DateTime, Date, String, Integer, Enum, Float, Text, ForeignKey, create_engine, func
+from sqlalchemy import Column, VARCHAR, DateTime, Date, String, Integer, Enum, Text, ForeignKey, create_engine, func
 from sqlalchemy.orm import relationship, backref, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
+import decimal
+import sqlalchemy.types as types
 
 default_currency = 'ILS'
 Base = declarative_base()
 CURRENCY_SCALE=100000
+PRECISSION = decimal.Decimal(10) ** -2
 
-def str2int(s):
-    a = s.split('.')
-    if len(a) < 2:
-        return int(s+'00000')
-    return int(a[0]+(a[1]+'00000')[:5])
 
-def int2str(s):
-    return s[:-5]+'.'+s[-5:-4]+(s[-4:].rstrip('0'))
+class SqliteNumeric(types.TypeDecorator):
+    impl = types.String
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(types.VARCHAR(100))
+    def process_bind_param(self, value, dialect):
+        return str(value)
+    def process_result_value(self, value, dialect):
+        return decimal.Decimal(value)
+Numeric = SqliteNumeric
 
 class Interval(Base):
     __tablename__ = 'intervals'
@@ -54,7 +59,7 @@ class Rate(Base):
         "Currency", primaryjoin='currency.c.id==rates.c.currency_a')
     b = relationship(
         "Currency", primaryjoin='currency.c.id==rates.c.currency_b')
-    rate = Column(Float, nullable=False)
+    rate = Column(Numeric(12, 2), nullable=False)
 
     def __repr__(self):
         return "{}={:.4f}*{}".format(self.b,  self.rate, self.a)
@@ -74,12 +79,22 @@ class Currency(Base):
     title = Column(String)
     name = Column(String)
     default = Column(Integer)
+    # rate = relationship("Rate")
+
+    def _rate(self):
+        return DB.query(Rate).filter(Rate.currency_b==self.id).order_by(Rate.rate_date.desc()).first()
 
     def __repr__(self):
         return "{}".format(self.title)
 
     def to_dict(self):
-        return {'id': self.id, 'title': self.title, 'name': self.name, 'default': self.default}
+        return {
+            'id': self.id,
+            'title': self.title,
+            'name': self.name,
+            'rate': self._rate(),
+            'default': self.default
+            }
 
 
 class Income(Base):
@@ -88,7 +103,7 @@ class Income(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')  # , back_populates='incomes')
-    sum = Column(VARCHAR)
+    sum = Column(Numeric(12,2))
     start_date = Column(Date)
     end_date = Column(Date, nullable=True)
     period_id = Column(Integer, ForeignKey('intervals.id'))
@@ -103,7 +118,7 @@ class Income(Base):
             'id': self.id,
             'title': self.title,
             'currency': self.currency,
-            'sum': int2str(self.sum),
+            'sum': self.sum,
             'start_date': self.start_date.isoformat(),
             'end_date': (None if self.end_date == None else self.end_date.isoformat()),
             'period': self.period
@@ -120,7 +135,7 @@ class Income(Base):
             backlog.append({
                 'id': 0,
                 'time': d,
-                'sum': int2str(self.sum),
+                'sum': self.sum,
                 'income': self,
                 'comment': ''
                 }) #Transaction(time=d, account_id=0, sum=self.sum, income_id=self.id, comment=self.title))
@@ -167,11 +182,12 @@ class Account(Base):
     show = Column(Enum('y','n'), default='y')
 
     def to_dict(self):
+        #decimal.getcontext().prec=PRECISSION
         return {
             'id': self.id,
             'title': self.title,
             'currency': self.currency,
-            'sum': int2str("{}".format(self.sum())),
+            'sum': self.sum(),
             'show': self.show,
             'deleted': self.deleted
         }
@@ -179,14 +195,14 @@ class Account(Base):
     def sum(self):
         #return func.sum(Transaction.sum)
         try:
-            return int(DB.query(
+            return decimal.Decimal(DB.query(
                 Transaction.account_id,
                 func.sum(Transaction.sum).label('total')
                 ).filter(
                     Transaction.account_id==self.id
-                    ).group_by(Transaction.account_id).first()[1])
+                    ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
         except:
-            return "0"
+            return decimal.Decimal(0)
 
     def __repr__(self):
         return "{:10s}".format(self.title)
@@ -225,7 +241,7 @@ class Transaction(Base):
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")
-    sum = Column(VARCHAR, nullable=False)
+    sum = Column(Numeric(12,2), nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
@@ -238,7 +254,7 @@ class Transaction(Base):
             "id": self.id,
             "time": self.time.isoformat(),
             "account": self.account,
-            "sum": int2str(self.sum),
+            "sum": self.sum,
             "transfer": self.transfer,
             "income": self.income,
             "comment": self.comment 

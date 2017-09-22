@@ -1,4 +1,4 @@
 # TODO list
 
-* accounts management
 * goals
+* list of incomes shall be uble pay forward

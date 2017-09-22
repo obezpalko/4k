@@ -240,12 +240,12 @@ function update_row(event, to_update, clean=false){
         url: "/api/" + to_update ,
         data: JSON.stringify(data),
         success: function(data){
-          var new_row=template.clone(true);
-          
+          var new_row=template.clone(true).removeClass('template');
           new_row.find('.row_update').each(function(){
             $(this).text(json_names($(this).attr('name'), data))
-          }).removeClass('template').insertAfter(template).show();
-          
+          });
+          template.after(new_row);
+          new_row.show();
           get_balance(balance_url);
           reload_all();
         }

@@ -8,13 +8,12 @@ import http.client
 import json
 import csv
 from .utils import *
-from .income import str2int, int2str, DB, Currency, Rate, Income, Interval, Transaction, Account, CURRENCY_SCALE
+from .income import  PRECISSION, DB, Currency, Rate, Income, Interval, Transaction, Account, CURRENCY_SCALE
 import datetime
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func
-
-
+import decimal
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
 
@@ -29,6 +28,7 @@ app.config.update(dict(
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
  
+# decimal.getcontext().prec=PRECISSION
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -37,7 +37,9 @@ def json_serial(obj):
         return obj.isoformat()
     if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
         return obj.to_dict()
-    raise TypeError("Type %s not serializable" % type(obj))
+    if isinstance(obj, decimal.Decimal):
+        return format(obj.__str__())
+    raise TypeError("Type {} not serializable ({})".format( type(obj), obj))
 
 
 @app.cli.command('rates')
@@ -66,7 +68,7 @@ def update_rates():
                             currency_a=default_currency.id,
                             currency_b=c_title[row[0].replace(
                                 '{}=X'.format(default_currency.title), '')],
-                            rate=float(row[1])))
+                            rate=row[1]))
     DB.bulk_save_objects(objects)
     DB.commit()
 
@@ -159,8 +161,7 @@ def account_POST(*args, **kwargs):
     DB.add(a)
     DB.flush()
     if (float(obj['sum'])>0):
-        DB.add(Transaction(account_id=a.id, comment='initial summ', time=date.today(),
-            sum=int(float(obj['sum'])*CURRENCY_SCALE)))
+        DB.add(Transaction(account_id=a.id, show=obj['show'], comment='initial summ', time=date.today(), sum=obj['sum']))
     DB.commit()
     return a
 
@@ -171,7 +172,7 @@ def account_PUT(*args, **kwargs):
     a.title=obj['title']
     a.show=obj['show']
     a.currency_id=obj['currency.id']
-    delta_sum = int(str2int(obj['sum'])) - int(a.sum())
+    delta_sum = decimal.Decimal(obj['sum']) - a.sum()
     if delta_sum != 0:
         t = Transaction(time=date.today(), sum=delta_sum, account_id=id, comment='fix account summ')
         DB.add(t)
@@ -185,7 +186,7 @@ def income_POST(*args, **kwargs):
     i=Income(
         title=obj['title'],
         currency_id=int(obj['currencyi.d']),
-        sum=str2int(obj['sum']),
+        sum=decimal.Decimal(obj['sum']),
         start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date(),
         end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date()),
         period_id=int(obj['period.id'])
@@ -205,7 +206,7 @@ def income_PUT(*args, **kwargs):
     #try:
     i.title=obj['title']
     i.currency_id=int(obj['currency.id'])
-    i.sum=str2int(obj['sum'])
+    i.sum=decimal.Decimal(obj['sum'])
     i.start_date=datetime.datetime.strptime( obj['start_date'], '%Y-%m-%d').date()
     i.end_date=(None if obj['end_date']=='' else datetime.datetime.strptime( obj['end_date'], '%Y-%m-%d').date())
     i.period_id=int(obj['period.id'])
@@ -231,7 +232,7 @@ def transaction_POST(*args, **kwargs):
     i=Transaction(
         time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date(),
         account_id=int(obj['account.id']),
-        sum=str2int(obj['sum']),
+        sum=decimal.Decimal(obj['sum']),
         transfer=int(obj['transfer']),
         income_id=int(obj['income.id']),
         comment=obj['comment']
@@ -251,7 +252,7 @@ def transaction_PUT(*args, **kwargs):
     #try:
     i.time=datetime.datetime.strptime( obj['time'], '%Y-%m-%d').date()
     i.account_id=int(obj['account.id']) if obj['account.id'] != '' else None
-    i.sum=str2int(obj['sum'])
+    i.sum=decimal.Decimal(obj['sum'])
     i.transfer=int(obj['transfer']) if obj['transfer'] not in ['0', ''] else None
     i.income_id=int(obj['income.id']) if obj['income.id'] not in ['0', ''] else None
     i.comment=obj['comment']
@@ -263,6 +264,7 @@ def transaction_PUT(*args, **kwargs):
 def balance_GET(*args, **kwargs):
     r = {}
     incomes = DB.query(Income).all()
+    
     for i in incomes:
         s = i.get_sum(start_date=kwargs['start_date'],
                       end_date=kwargs['end_date'])
@@ -273,14 +275,14 @@ def balance_GET(*args, **kwargs):
     total = 0
     for c in currency_GET():
         if c['title'] in r:
-            total += int(c['rate'] * r[c['title']])
-            r[c['title']] = int2str("{}".format(r[c['title']]))
-    r['TOTAL'] = int2str("{}".format(total))
+            total += decimal.Decimal(c['rate'] * r[c['title']])
+            r[c['title']] = r[c['title']]
+    r['TOTAL'] = total
     r['start_date'] = kwargs['start_date']
     r['end_date'] = kwargs['end_date']
     w = number_of_weeks(kwargs['start_date'].strftime('%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
     r['weeks'] = w
-    r['weekly'] = float(r['TOTAL'])//w
+    r['weekly'] = r['TOTAL']//w
     return r
 
 def backlog_GET(*args, **kwargs):
