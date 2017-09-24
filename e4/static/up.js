@@ -3,13 +3,15 @@
 function update_option(element, url, title_fields=['title']){
   $.getJSON(url, function(data){
     var options = [];
+    var titles;
     $.each(data, function(key, val){
-      if (val['show'] == 'n' ) { return false; }
+      if (val['show'] != 'n' ) { 
       titles = []
       title_fields.forEach( function(t){ titles.push( (t=='title') ? val[t] : val[t]['title'])});
       options.push('<option value="'+ val['id'] +'"'+ ((val['default']==1) ? " selected" : "") +'>'+ titles.join(' ') +'</option>')
-      
+      }
     });
+  
     $(element).html(options.join(''));
   })
 }

@@ -328,12 +328,14 @@ def balance_GET(*args, **kwargs):
 #
 def backlog_GET(*args, **kwargs):
     results = []
+    week_ahead = datetime.date.today() - datetime.timedelta( datetime.date.today().isoweekday() % 7 ) + datetime.timedelta(14)
     if kwargs['id'] > 0:
-        return income_GET(id=kwargs['id']).get_backlog()
-    for r in list(map(lambda x: x.get_backlog(), income_GET(id=0))):
+        return income_GET(id=kwargs['id'], end_date=week_ahead).get_backlog()
+    for r in list(map(lambda x: x.get_backlog(), income_GET(id=0, end_date=week_ahead))):
         for b in r:
             results.append(b)
-    return results
+    
+    return sorted(results, key=lambda x: x['time'], reverse=True)
 
 
 def backlog_DELETE(*args, **kwargs):
