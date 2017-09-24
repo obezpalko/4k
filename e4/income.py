@@ -7,8 +7,8 @@ try:
     from .utils import *
 except ModuleNotFoundError:
     from utils import *
-from json import JSONEncoder
-from sqlalchemy import Column, VARCHAR, DateTime, Date, String, Integer, Enum, Text, ForeignKey, create_engine, func
+# from json import JSONEncoder
+from sqlalchemy import and_, Column, VARCHAR, DateTime, Date, String, Integer, Enum, Text, ForeignKey, create_engine, func
 from sqlalchemy.orm import relationship, backref, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -86,7 +86,7 @@ class Currency(Base):
     title = Column(String)
     name = Column(String)
     default = Column(Integer)
-    # rate = relationship("Rate")
+    rate = relationship("Rate", foreign_keys=[Rate.currency_b])
 
     def _rate(self):
         return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(Rate.rate_date.desc()).first()
@@ -142,6 +142,7 @@ class Income(Base):
             backlog.append({
                 'id': 0,
                 'time': d,
+                'origin_time': d,
                 'sum': self.sum,
                 'income': self,
                 'comment': ''
@@ -151,24 +152,37 @@ class Income(Base):
     def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
         list_dates = []
         # s = 0
-        _sd = max(start_date, self.start_date)
+        _start_date = max(start_date, self.start_date)
 
         if self.end_date:
-            _ed = min(end_date, self.end_date)
+            _end_date = min(end_date, self.end_date)
         else:
-            _ed = end_date
-        if _sd > _ed:
+            _end_date = end_date
+        if _start_date > _end_date:
             return []
-        if _sd == self.start_date:
+        if _start_date == self.start_date:
             s = int(self.sum)
-            list_dates.append(_sd)
+            list_dates.append(_start_date)
 
         nd = next_date(self.start_date, (self.period.value, self.period.item))
-        while nd <= _ed:
-            if nd >= _sd and nd <= _ed:
+        while nd <= _end_date:
+            if nd >= _start_date and nd <= _end_date:
                 #s += int(self.sum)
                 list_dates.append(nd)
             nd = next_date(nd, (self.period.value, self.period.item))
+
+        pf_dates = DB.query(Payforward.income_date).filter(
+            and_(
+                Payforward.income_date > _start_date,
+                Payforward.income_date < _end_date)).all()
+        
+        for d, in pf_dates:
+            #print("d={}".format(d))
+            try:
+                list_dates.remove(d)
+            except ValueError:
+                pass
+        #print(list_dates)    
         return list_dates
 
     def get_sum(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
@@ -254,6 +268,7 @@ class Transaction(Base):
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
     income = relationship("Income")  # , back_populates='transactions')
     comment = Column(Text)
+    
 
     def to_dict(self):
         return {
@@ -283,6 +298,8 @@ class Payforward(Base):
 
 
 
+
+#
 engine = create_engine('sqlite:///e4/e4.db')
 session = sessionmaker()
 

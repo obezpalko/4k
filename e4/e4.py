@@ -8,11 +8,11 @@ import http.client
 import json
 import csv
 from .utils import *
-from .income import DB, Currency, Rate, Income, Interval, Transaction, Account
+from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
 import datetime
 
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, and_, or_
 import decimal
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
@@ -115,7 +115,7 @@ def logout():
     flash('You were logged out')
     return redirect(url_for('show_entries'))
 
-
+#
 def currency_GET(*args, **kwargs):
     entries = []
     if 'id' in kwargs and kwargs['id']:
@@ -130,7 +130,7 @@ def currency_GET(*args, **kwargs):
             entries.append(rate.to_dict())
     return entries
 
-
+#
 def income_DELETE(*args, **kwargs):
     id = kwargs['id']
     income = DB.query(Income).filter_by(id=id).delete()
@@ -142,9 +142,49 @@ def income_GET(*args, **kwargs):
     return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
 
 
+def income_POST(*args, **kwargs):
+    id = kwargs['id']
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    # try:
+    i = Income(
+        title=obj['title'],
+        currency_id=int(obj['currencyi.d']),
+        sum=decimal.Decimal(obj['sum']),
+        start_date=datetime.datetime.strptime(
+            obj['start_date'], '%Y-%m-%d').date(),
+        end_date=(None if obj['end_date'] == '' else datetime.datetime.strptime(
+            obj['end_date'], '%Y-%m-%d').date()),
+        period_id=int(obj['period.id'])
+    )
+    DB.add(i)
+    DB.flush()
+    DB.commit()
+    # except:
+    #    abort(400)
+    return i
+
+
+def income_PUT(*args, **kwargs):
+    id = kwargs['id']
+    i = DB.query(Income).get(id)
+
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    # try:
+    i.title = obj['title']
+    i.currency_id = int(obj['currency.id'])
+    i.sum = decimal.Decimal(obj['sum'])
+    i.start_date = datetime.datetime.strptime(
+        obj['start_date'], '%Y-%m-%d').date()
+    i.end_date = (None if obj['end_date'] == '' else datetime.datetime.strptime(
+        obj['end_date'], '%Y-%m-%d').date())
+    i.period_id = int(obj['period.id'])
+    # except:
+    #    abort(400)
+    DB.commit()
+    return {'updated': DB.query(Income).get(id), "previous": i}
+
 incomes_GET = income_GET
-
-
+#
 def account_GET(*args, **kwargs):
     return DB.query(Account).filter(Account.deleted == 'n').all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
 
@@ -189,54 +229,13 @@ def account_PUT(*args, **kwargs):
     DB.commit()
     return {'updated': DB.query(Account).get(id), "previous": a}
 
-
-def income_POST(*args, **kwargs):
-    id = kwargs['id']
-    obj = json.loads(request.data.decode('utf-8', 'strict'))
-    # try:
-    i = Income(
-        title=obj['title'],
-        currency_id=int(obj['currencyi.d']),
-        sum=decimal.Decimal(obj['sum']),
-        start_date=datetime.datetime.strptime(
-            obj['start_date'], '%Y-%m-%d').date(),
-        end_date=(None if obj['end_date'] == '' else datetime.datetime.strptime(
-            obj['end_date'], '%Y-%m-%d').date()),
-        period_id=int(obj['period.id'])
-    )
-    DB.add(i)
-    DB.flush()
-    DB.commit()
-    # except:
-    #    abort(400)
-    return i
-
-
-def income_PUT(*args, **kwargs):
-    id = kwargs['id']
-    i = DB.query(Income).get(id)
-
-    obj = json.loads(request.data.decode('utf-8', 'strict'))
-    # try:
-    i.title = obj['title']
-    i.currency_id = int(obj['currency.id'])
-    i.sum = decimal.Decimal(obj['sum'])
-    i.start_date = datetime.datetime.strptime(
-        obj['start_date'], '%Y-%m-%d').date()
-    i.end_date = (None if obj['end_date'] == '' else datetime.datetime.strptime(
-        obj['end_date'], '%Y-%m-%d').date())
-    i.period_id = int(obj['period.id'])
-    # except:
-    #    abort(400)
-    DB.commit()
-    return {'updated': DB.query(Income).get(id), "previous": i}
-
-
+#
 def transaction_DELETE(*args, **kwargs):
     id = kwargs['id']
     income = DB.query(Transaction).filter_by(id=id).delete()
+    DB.query(Payforward).filter_by(transaction_id=id).delete()
     DB.commit()
-    return {'deleted': id}
+    return {'deleted': income}
 
 
 def transaction_GET(*args, **kwargs):
@@ -283,7 +282,7 @@ def transaction_PUT(*args, **kwargs):
     DB.commit()
     return {'updated': DB.query(Transaction).get(id), "previous": i}
 
-
+#
 def balance_GET(*args, **kwargs):
     r = {}
     incomes = DB.query(Income).all()
@@ -300,19 +299,38 @@ def balance_GET(*args, **kwargs):
         if c['title'] in r:
             total += decimal.Decimal(c['rate'] * r[c['title']])
             r[c['title']] = r[c['title']]
-    r['TOTAL'] = total
+    r['TOTAL'] = int(total)
     r['start_date'] = kwargs['start_date']
     r['end_date'] = kwargs['end_date']
     w = number_of_weeks(kwargs['start_date'].strftime(
         '%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
     r['weeks'] = w
-    r['weekly'] = r['TOTAL'] // w
+    today = datetime.date.today()
+    
+    week_begin = today - datetime.timedelta( today.isoweekday() % 7 ) # sunday
+    week_end = week_begin + datetime.timedelta(7)
+    # print(week_begin, week_end)
+    week_sum = decimal.Decimal(0)
+    tmp_results = DB.query(Transaction).join(Account).join(Currency).filter(
+        and_(
+            or_(Transaction.income_id <= 0, Transaction.income_id == None),
+        and_(Transaction.sum < 0 ,
+        and_( Transaction.time >= week_begin, Transaction.time < week_end)
+        ))).all()
+    
+    for t in tmp_results:
+        #print(t)
+        week_sum += t.sum*t.account.currency._rate().rate
+
+    r['weekly'] = "{}/{}".format(int(-1*week_sum), r['TOTAL'] // w )
     return r
 
-
+#
 def backlog_GET(*args, **kwargs):
     results = []
-    for r in list(map(lambda x: x.get_backlog(), DB.query(Income).all())):
+    if kwargs['id'] > 0:
+        return income_GET(id=kwargs['id']).get_backlog()
+    for r in list(map(lambda x: x.get_backlog(), income_GET(id=0))):
         for b in r:
             results.append(b)
     return results
@@ -322,7 +340,7 @@ def backlog_DELETE(*args, **kwargs):
     # just create transaction with sum zero
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     t = Transaction(
-        time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
+        time=datetime.datetime.strptime(obj['origin_time'], '%Y-%m-%d').date(),
         account_id=0,
         sum=0,
         income_id=obj['income.id'],
@@ -336,14 +354,27 @@ def backlog_DELETE(*args, **kwargs):
 def backlog_PUT(*args, **kwargs):
     # actually insert transaction
     obj = json.loads(request.data.decode('utf-8', 'strict'))
+    origin_time = datetime.datetime.strptime(obj['origin_time'], '%Y-%m-%d').date()
+    operation_time = datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date()
+
     t = Transaction(
-        time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
+        time=operation_time,
         account_id=int(obj['account.id']),
         sum=obj['sum'],
         income_id=obj['income.id'],
         comment=obj['comment'])
     DB.add(t)
     DB.flush()
+    if origin_time > operation_time:
+        # payment before
+        DB.add(
+            Payforward(
+                income_id=int(obj['income.id']),
+                income_date=origin_time,
+                payment_date=operation_time,
+                transaction_id=t.id
+            )
+        )
     DB.commit()
     return t
 
@@ -379,7 +410,7 @@ s_date = datetime.date.today()
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
 @app.route('/api/<string:api>/<int:id>', defaults={'end_date': s_date.replace(year=(s_date.year + 1))}, methods=['GET', 'DELETE', 'PUT'])
-@app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date.isoformat()}, methods=['GET'])
+@app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date - datetime.timedelta( s_date.isoweekday() % 7 )}, methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(*args, **kwargs):
     try:

@@ -4,12 +4,21 @@ function update_option(element, url, title_fields=['title']){
   $.getJSON(url, function(data){
     var options = [];
     $.each(data, function(key, val){
+      if (val['show'] == 'n' ) { return false; }
       titles = []
       title_fields.forEach( function(t){ titles.push( (t=='title') ? val[t] : val[t]['title'])});
       options.push('<option value="'+ val['id'] +'"'+ ((val['default']==1) ? " selected" : "") +'>'+ titles.join(' ') +'</option>')
+      
     });
     $(element).html(options.join(''));
   })
+}
+
+function getSunday(d) {
+  d = new Date(d);
+  var day = d.getDay(),
+      diff = d.getDate() - day; // adjust when day is sunday
+  return new Date(d.setDate(diff));
 }
 
 function getDialogButton( dialog_selector, button_name ) {

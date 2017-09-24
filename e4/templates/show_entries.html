@@ -15,14 +15,49 @@
       <input name=end_date class="end_date datepicker" size=11>
       <dl class=accounts></dl>
       </div>
-
+    
     <div id=tabs style="width:70%; overflow: hidden;">
-      <ul>      
+      <ul>
+        <li><a href="#tab-week">this week</a></li>
         <li><a href="#tab-backlog">backlog</a></li>
         <li><a href="#tab-incomes">incomes</a></li>
         <li><a href="#tab-transactions">transactions</a></li>
         <li><a href="#tab-accounts">accounts</a></li>
        </ul>
+       <div id=tab-week>
+          <table  class=entries id=weeks_table>
+              <tr class=table_header>
+                <th class="hidden">id</th>
+                <th>time</th>
+                <th>sum</th>
+                <th class=hidden>transfer</th>
+                <th class=hidden>income_id</th>
+                <th>account</th>
+                <th>comment</th>
+                <th>income</th>
+                <th>
+                  <span href=# onclick="update_row(event, 'transaction', true);" class="ui-icon ui-icon-document"></span>
+                  </th>
+                </tr>
+                <tr class="template hidden">
+                    <td class="hidden row_update" name=id></td>
+                    <td class=row_update name=time></td>
+                    <td class=row_update name=sum></td>
+                    <td class="hidden row_update" name=transfer></td>
+                    <td class="hidden row_update" name=income.id></td>
+                    <td>
+                      <span class="hidden row_update" name=account.id></span>
+                      <span class=row_update name=account.title></span>
+                      (<span class=row_update name=account.currency.title></span>)
+                      </td>
+                    <td class=row_update name=comment></td>
+                    <td class=row_update name=income.title></td>
+                    <td><span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span></td>
+                    </tr>
+    
+              </table>
+    
+       </div>
       <div id=tab-accounts>
           <table class=entries id=accounts_table>
               <tr class=table_header>
@@ -63,7 +98,10 @@
                     </th>
                   </tr>
                   <tr class="template hidden">
-                      <td class="hidden row_update" name=id></td>
+                      <td class="hidden">
+                        <span class=row_update name=id></span>
+                        <span class=row_update name=origin_time></span>
+                      </td>
                       <td class=row_update name=time></td>
                       <td class=row_update name=sum></td>
                       <td class=row_update name=income.currency.title></td>
@@ -184,7 +222,8 @@
         <dl>
           <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
           <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
-          <dt>Time</dt><dd><input type=text size=30 name=time class="set_today form_save datepicker"></dd>
+          <dt>Time</dt><dd><input type=text size=30 name=time class="set_today form_save datepicker">
+          <input type=text size=30 name=origin_time class="set_today form_save datepicker hidden" disabled></dd>
           <dt>Account</dt><dd><select name=account.id class="form_save account_selector"></select></dd>
           <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
           <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
