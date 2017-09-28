@@ -4,7 +4,7 @@
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}" />
 <style type=text/css>
 
-.currencies  { /*display: inline-block; */ width: 40%; float: right; 
+.currencies  { /*display: Timeinline-block; */ width: 40%; float: right; 
                   list-style-type: none; padding: 0; font-family: monospace; 
                   margin: 0; padding-right: 3em; background-color:  #FFFFFF; font-size: 75%; text-align: right; }
 .currencies li  { display: inline; padding-left: 0.3em; padding-right: 0.3em; }
@@ -90,6 +90,10 @@ function load_table(table_name, url){
   });
 }
 
+function prepare_transfer(event) {
+  $(event.target).parents('form').find('.transfer').show().addClass('form_save');
+  return true;
+}
 
 function get_balance(url){
   $.getJSON('/api/currency', function(data){
@@ -256,10 +260,11 @@ function update_row(event, to_update, clean=false){
      ]
   }
   
-  $('#' + to_update).dialog({ buttons: buttons }).focus();
-  
+  $('#' + to_update).find('.transfer').hide().addClass('hidden').removeClass('form_save');
+  $('#' + to_update).dialog({ buttons: buttons }).focus(); 
 
 }
+
 
 $( function() {
     $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });

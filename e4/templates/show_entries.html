@@ -57,7 +57,7 @@
     
               </table>
     
-       </div>
+        </div>
       <div id=tab-accounts>
           <table class=entries id=accounts_table>
               <tr class=table_header>
@@ -81,7 +81,7 @@
                     </td>
                 </tr>
           </table>
-      </div>
+       </div>
       <div id=tab-backlog >
           <table class=entries id=backlogs_table>
               <tr class=table_header>
@@ -182,7 +182,7 @@
 
           </table>
         </div>
-      </div>
+       </div>
   {% if session.logged_in %}
   {% endif %}
   <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="income">
@@ -210,25 +210,31 @@
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
-      <dt>Time</dt><dd><input type=text size=30 name=time class="set_today form_save datepicker"></dd>
-      <dt>Account</dt><dd><select name=account.id class="form_save account_selector"></select></dd>
+      <dt class="hidden transfer">New Summ</dt><dd class="hidden transfer"><input name=new_sum class="" size=11></dd>
+      <dt>Time</dt><dd><input type=text size=11 name=time class="set_today form_save datepicker"></dd>
+      <dt>Account</dt>
+        <dd>
+          <select name=account.id class="form_save account_selector"></select>
+          <span class="ui-icon ui-icon-link" onclick="prepare_transfer(event)"></span>
+         </dd>
+      <dt class="hidden transfer">To account</dt><dd class="hidden transfer"><select name=new_account.id class="account_selector"></select></dd>
       <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
       <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
       <dt>Income_id</dt><dd><input name=income.id class=form_save value=0 disabled></input></dd>    
       </dl>
     </form>
 
-    <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="backlog">
-        <dl>
-          <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
-          <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
-          <dt>Time</dt><dd><input type=text size=30 name=time class="set_today form_save datepicker">
-          <input type=text size=30 name=origin_time class="set_today form_save datepicker hidden" disabled></dd>
-          <dt>Account</dt><dd><select name=account.id class="form_save account_selector"></select></dd>
-          <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
-          <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
-          <dt>Income_id</dt><dd><input name=income.id class=form_save value=0 disabled></input></dd>    
-          </dl>
-        </form>
+  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="backlog">
+    <dl>
+      <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
+      <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
+      <dt>Time</dt><dd><input type=text size=11 name=time class="set_today form_save datepicker">
+      <input type=text size=30 name=origin_time class="set_today form_save datepicker hidden" disabled></dd>
+      <dt>Account</dt><dd><select name=account.id class="form_save account_selector"></select></dd>
+      <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
+      <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
+      <dt>Income_id</dt><dd><input name=income.id class=form_save value=0 disabled></input></dd>    
+      </dl>
+    </form>
  </div>
 {% endblock %}

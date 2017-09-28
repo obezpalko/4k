@@ -2,20 +2,21 @@
 """
 income class
 """
-from datetime import datetime, date, time, timedelta
+from datetime import date, timedelta
+
 try:
-    from .utils import *
-except ModuleNotFoundError:
-    from utils import *
-# from json import JSONEncoder
-from sqlalchemy import and_, Column, VARCHAR, DateTime, Date, String, Integer, Enum, Text, ForeignKey, create_engine, func
-from sqlalchemy.orm import relationship, backref, sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+    from .utils import next_date
+except ImportError:
+    from utils import next_date
 
 import decimal
+from sqlalchemy import and_, func, create_engine, \
+    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey
+from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
 import sqlalchemy.types as types
 
-default_currency = 'ILS'
 Base = declarative_base()
 PRECISSION = decimal.Decimal(10) ** -2
 
@@ -32,11 +33,20 @@ class SqliteNumeric(types.TypeDecorator):
     def process_result_value(self, value, dialect):
         return decimal.Decimal(value)
 
+    def python_type(self):
+        pass
+
+    def process_literal_param(self, value, dialect):
+        pass
+
 
 Numeric = SqliteNumeric
 
 
 class Interval(Base):
+    """
+    define intervals
+    """
     __tablename__ = 'intervals'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
@@ -56,6 +66,9 @@ class Interval(Base):
 
 
 class Rate(Base):
+    """
+    currenciess and rates
+    """
     __tablename__ = 'rates'
     id = Column(Integer, primary_key=True)
     rate_date = Column(DateTime)
@@ -81,6 +94,9 @@ class Rate(Base):
 
 
 class Currency(Base):
+    """
+    currencies definitions
+    """
     __tablename__ = 'currency'
     id = Column(Integer, primary_key=True)
     title = Column(String)
@@ -88,7 +104,7 @@ class Currency(Base):
     default = Column(Integer)
     rate = relationship("Rate", foreign_keys=[Rate.currency_b])
 
-    def _rate(self):
+    def get_rate(self):
         return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(Rate.rate_date.desc()).first()
 
     def __repr__(self):
@@ -99,12 +115,14 @@ class Currency(Base):
             'id': self.id,
             'title': self.title,
             'name': self.name,
-            'rate': self._rate(),
+            'rate': self.get_rate(),
             'default': self.default
         }
 
 
 class Income(Base):
+    """
+    """
     __tablename__ = 'incomes'
     id = Column(Integer, primary_key=True)
     title = Column(String)
@@ -138,11 +156,11 @@ class Income(Base):
             last_payment = self.start_date
         else:
             last_payment = last_payment + timedelta(1)
-        for d in self.get_dates(start_date=last_payment, end_date=max_date):
+        for i in self.get_dates(start_date=last_payment, end_date=max_date):
             backlog.append({
                 'id': 0,
-                'time': d,
-                'origin_time': d,
+                'time': i,
+                'origin_time': i,
                 'sum': self.sum,
                 'income': self,
                 'comment': ''
@@ -161,31 +179,31 @@ class Income(Base):
         if _start_date > _end_date:
             return []
         if _start_date == self.start_date:
-            s = int(self.sum)
             list_dates.append(_start_date)
 
-        nd = next_date(self.start_date, (self.period.value, self.period.item))
-        while nd <= _end_date:
-            if nd >= _start_date and nd <= _end_date:
+        _next_date = next_date(self.start_date, (self.period.value, self.period.item))
+        while _next_date <= _end_date:
+            if _next_date >= _start_date and _next_date <= _end_date:
                 #s += int(self.sum)
-                list_dates.append(nd)
-            nd = next_date(nd, (self.period.value, self.period.item))
+                list_dates.append(_next_date)
+            _next_date = next_date(_next_date, (self.period.value, self.period.item))
 
         pf_dates = DB.query(Payforward.income_date).filter(
             and_(
                 Payforward.income_date > _start_date,
                 Payforward.income_date < _end_date)).all()
         
-        for d, in pf_dates:
-            #print("d={}".format(d))
+        for i, in pf_dates:
             try:
-                list_dates.remove(d)
+                list_dates.remove(i)
             except ValueError:
                 pass
-        #print(list_dates)    
         return list_dates
 
-    def get_sum(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
+    def get_sum(
+            self,
+            start_date=date.today(),
+            end_date=date.today().replace(year=(date.today().year + 1))):
         try:
             return len(self.get_dates(start_date, end_date)) * int(self.sum)
         except IndexError:
@@ -193,6 +211,8 @@ class Income(Base):
 
 
 class Account(Base):
+    """
+    """
     __tablename__ = 'accounts'
     id = Column(Integer, primary_key=True)
     title = Column(String)
@@ -215,24 +235,25 @@ class Account(Base):
 
     def sum(self):
         # return func.sum(Transaction.sum)
-        try:
-            return decimal.Decimal(DB.query(
-                Transaction.account_id,
-                func.sum(Transaction.sum).label('total')
-            ).filter(
-                Transaction.account_id == self.id
-            ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
-        except:
-            return decimal.Decimal(0)
+        # try:
+        return decimal.Decimal(DB.query(
+            Transaction.account_id,
+            func.sum(Transaction.sum).label('total')
+        ).filter(
+            Transaction.account_id == self.id
+        ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
+        #except:
+        #    return decimal.Decimal(0)
 
     def __repr__(self):
         return "{:10s}".format(self.title)
 
-
+'''
 class Balance(object):
     def __init__(self, database=None):
         object.__init__(self)
         self.database = database
+        self.incomes = []
 
     def _get_currencies(self):
         c = set()
@@ -254,9 +275,11 @@ class Balance(object):
                 t["_{}".format(default_currency)] += b * \
                     self.current_rates[i.currency]
         return t
-
+'''
 
 class Transaction(Base):
+    """
+    """
     __tablename__ = 'transactions'
     id = Column(Integer, primary_key=True)
     time = Column(Date, nullable=False)
@@ -268,7 +291,7 @@ class Transaction(Base):
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
     income = relationship("Income")  # , back_populates='transactions')
     comment = Column(Text)
-    
+
 
     def to_dict(self):
         return {
@@ -282,10 +305,13 @@ class Transaction(Base):
         }
 
     def __repr__(self):
-        return "{:6d} {} {} {} {} {}".format(self.id, self.time, self.account,  self.sum, self.transfer, self.income)
+        return "{:6d} {} {} {} {} {}".format(self.id, self.time, self.account,
+                                             self.sum, self.transfer, self.income)
 
 
 class Payforward(Base):
+    """
+    """
     __tablename__ = 'payforwards'
     id = Column(Integer, primary_key=True)
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
@@ -295,9 +321,6 @@ class Payforward(Base):
     transaction_id = Column(Integer, ForeignKey(
         'transactions.id'), nullable=False)
     transaction = relationship("Transaction")
-
-
-
 
 #
 engine = create_engine('sqlite:///e4/e4.db')
@@ -310,4 +333,5 @@ DB = session()
 
 
 if __name__ == '__main__':
+    import sys
     sys.exit()

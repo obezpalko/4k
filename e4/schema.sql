@@ -1,4 +1,4 @@
-PRAGMA foreign_keys = OFF;
+-- PRAGMA foreign_keys=OFF;
 drop table if exists intervals;
 create table intervals (
   id integer primary key,
@@ -30,24 +30,6 @@ insert into currency ("index") values ('EUR');
 insert into currency ("index") values ('GBP');
 
 
--- drop table if exists incomes;
-create table incomes (
-  id integer primary key,
-  title text not null,
-  currency REFERENCES currency(id) not null,
-  sum real not null default 0.0,
-  start_date numeric not null,
-  end_date numeric,
-  period REFERENCES intervals(id),
-  FOREIGN KEY(period) REFERENCES intervals(id)
-);
 
--- drop table if exists rates;
-create table rates (
-rate_date numeric not null,
-currency_a references currency(id),
-currency_b references currency(id),
-rate real not null
-);
 
-PRAGMA foreign_keys = ON;
+-- PRAGMA foreign_keys=ON;

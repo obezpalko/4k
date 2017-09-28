@@ -1,19 +1,20 @@
+"""
+main programm
+"""
 # all the imports
 import os
-import sqlite3
-from flask import Flask, request, session, g, redirect, url_for, abort, \
-    render_template, flash, Response
-# from flask_sqlalchemy import SQLAlchemy
 import http.client
 import json
 import csv
-from .utils import *
-from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
 import datetime
-
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, func, and_, or_
 import decimal
+from .utils import number_of_weeks
+from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
+from flask import Flask, request, session, redirect, url_for, \
+    render_template, flash
+
+from sqlalchemy import func, and_, or_
+
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
 
@@ -63,11 +64,16 @@ def update_rates():
         if len(row) < 1:
             continue
 
-        objects.append(Rate(rate_date=datetime.datetime.strptime("{} {}".format(row[2], row[3]), "%m/%d/%Y %I:%M%p"),
-                            currency_a=default_currency.id,
-                            currency_b=c_title[row[0].replace(
-                                '{}=X'.format(default_currency.title), '')],
-                            rate=row[1]))
+        objects.append(
+            Rate(
+                rate_date=datetime.datetime.strptime(
+                    "{} {}".format(
+                        row[2], row[3]),
+                    "%m/%d/%Y %I:%M%p"),
+                currency_a=default_currency.id,
+                currency_b=c_title[row[0].replace(
+                    '{}=X'.format(default_currency.title), '')],
+                rate=row[1]))
     DB.bulk_save_objects(objects)
     DB.commit()
 
@@ -83,15 +89,11 @@ def update_rates():
 @app.route('/incomes')
 @app.route('/income')
 def show_incomes():
-    # list(map(lambda x: x.to_dict() ,i))
     return render_template('show_entries.html',
-                           entries=list(
-                               map(lambda x: x.to_dict(), income_GET(id=0))),
-                           currencies=currency_GET(id=0),
-                           periods=intervals_GET(id=0),
-                           transactions=list(
-                               map(lambda x: x.to_dict(), transaction_GET(id=0)))
-                           )
+                           entries=list(map(lambda x: x.to_dict(), income_get(id=0))),
+                           currencies=currency_get(id=0),
+                           periods=intervals_get(id=0),
+                           transactions=list(map(lambda x: x.to_dict(), transaction_get(id=0))))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -116,39 +118,41 @@ def logout():
     return redirect(url_for('show_entries'))
 
 #
-def currency_GET(*args, **kwargs):
+def currency_get(**kwargs):
     entries = []
     if 'id' in kwargs and kwargs['id']:
         try:
-            q, rate, l = DB.query(Rate.currency_b, Rate, func.max(Rate.rate_date)).filter_by(
+            rate = DB.query(Rate.currency_b, Rate, func.max(Rate.rate_date)).filter_by(
                 currency_b=kwargs['id']).group_by(Rate.currency_b).first()
-            return rate.to_dict()
+            return rate[1].to_dict()
         except TypeError:
             return {}
     else:
-        for currency_id, rate, rate_date in DB.query(Rate.currency_b, Rate, func.max(Rate.rate_date)).group_by(Rate.currency_b).all():
-            entries.append(rate.to_dict())
+        rates = DB.query(Rate.currency_b,
+            Rate,
+            func.max(Rate.rate_date)
+            ).group_by(Rate.currency_b).all()
+        for rate in rates:
+            entries.append(rate[1].to_dict())
     return entries
 
 #
-def income_DELETE(*args, **kwargs):
-    id = kwargs['id']
-    income = DB.query(Income).filter_by(id=id).delete()
+def income_delete(**kwargs):
+    DB.query(Income).filter_by(id=kwargs['id']).delete()
     DB.commit()
-    return {'deleted': id}
+    return {'deleted': kwargs['id']}
 
 
-def income_GET(*args, **kwargs):
+def income_get(**kwargs):
     return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
 
 
-def income_POST(*args, **kwargs):
-    id = kwargs['id']
+def income_post(**kwargs):
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
     i = Income(
         title=obj['title'],
-        currency_id=int(obj['currencyi.d']),
+        currency_id=int(obj['currency.id']),
         sum=decimal.Decimal(obj['sum']),
         start_date=datetime.datetime.strptime(
             obj['start_date'], '%Y-%m-%d').date(),
@@ -164,9 +168,8 @@ def income_POST(*args, **kwargs):
     return i
 
 
-def income_PUT(*args, **kwargs):
-    id = kwargs['id']
-    i = DB.query(Income).get(id)
+def income_put(**kwargs):
+    i = DB.query(Income).get(kwargs['id'])
 
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
@@ -181,70 +184,71 @@ def income_PUT(*args, **kwargs):
     # except:
     #    abort(400)
     DB.commit()
-    return {'updated': DB.query(Income).get(id), "previous": i}
+    return {'updated': DB.query(Income).get(kwargs['id']), "previous": i}
 
-incomes_GET = income_GET
 #
-def account_GET(*args, **kwargs):
+def account_get(**kwargs):
     return DB.query(Account).filter(Account.deleted == 'n').all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
 
 
-def account_DELETE(*args, **kwargs):
-    id = kwargs['id']
-    income = DB.query(Account).get(id)
-    if DB.query(Transaction).filter(Transaction.account_id == id).count() > 0:
+def account_delete(**kwargs):
+    income = DB.query(Account).get(kwargs['id'])
+    if DB.query(Transaction).filter(Transaction.account_id == kwargs['id']).count() > 0:
         income.deleted = 'y'
         income.show = 'n'
     else:
-        DB.query(Account).filter(Account.id == id).delete()
+        DB.query(Account).filter(Account.id == kwargs['id']).delete()
     DB.commit()
-    return {'deleted': id}
+    return {'deleted': kwargs['id']}
 
 
-def account_POST(*args, **kwargs):
-    id = kwargs['id']
+def account_post(**kwargs):
+    """ add new account and set first transaction with rests of money """
     obj = json.loads(request.data.decode('utf-8', 'strict'))
-    a = Account(title=obj['title'], currency_id=int(obj['currency.id']))
-    DB.add(a)
+    new_account = Account(title=obj['title'], currency_id=int(obj['currency.id']))
+    DB.add(new_account)
     DB.flush()
     if (float(obj['sum']) > 0):
-        DB.add(Transaction(account_id=a.id,
-                           show=obj['show'], comment='initial summ', time=date.today(), sum=obj['sum']))
+        DB.add(Transaction(account_id=new_account.id,
+                           show=obj['show'],
+                           comment='initial summ',
+                           time=datetime.date.today(),
+                           sum=obj['sum']))
     DB.commit()
-    return a
+    return new_account
 
 
-def account_PUT(*args, **kwargs):
-    id = kwargs['id']
-    a = DB.query(Account).get(id)
+def account_put(**kwargs):
+    a = DB.query(Account).get(kwargs['id'])
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     a.title = obj['title']
     a.show = obj['show']
     a.currency_id = obj['currency.id']
     delta_sum = decimal.Decimal(obj['sum']) - a.sum()
     if delta_sum != 0:
-        t = Transaction(time=date.today(), sum=delta_sum,
-                        account_id=id, comment='fix account summ')
+        t = Transaction(time=datetime.date.today(), sum=delta_sum,
+                        account_id=kwargs['id'], comment='fix account summ')
         DB.add(t)
     DB.commit()
-    return {'updated': DB.query(Account).get(id), "previous": a}
+    return {'updated': DB.query(Account).get(kwargs['id']), "previous": a}
 
 #
-def transaction_DELETE(*args, **kwargs):
-    id = kwargs['id']
-    income = DB.query(Transaction).filter_by(id=id).delete()
-    DB.query(Payforward).filter_by(transaction_id=id).delete()
+def transaction_delete(**kwargs):
+    income = DB.query(Transaction).filter_by(id=kwargs['id']).delete()
+    DB.query(Payforward).filter_by(transaction_id=kwargs['id']).delete()
     DB.commit()
     return {'deleted': income}
 
 
-def transaction_GET(*args, **kwargs):
+def transaction_get(**kwargs):
     """ load intervals from database """
-    return DB.query(Transaction).order_by(Transaction.time).all() if kwargs['id'] == 0 else DB.query(Transaction).order_by(Transaction.time).get(kwargs['id'])
+    if kwargs['id'] == 0:
+        return DB.query(Transaction).order_by(Transaction.time).all()
+    else:
+        return DB.query(Transaction).order_by(Transaction.time).get(kwargs['id'])
 
 
-def transaction_POST(*args, **kwargs):
-    id = kwargs['id']
+def transaction_post(**kwargs):
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
     i = Transaction(
@@ -263,10 +267,8 @@ def transaction_POST(*args, **kwargs):
     return i
 
 
-def transaction_PUT(*args, **kwargs):
-    id = kwargs['id']
-    i = DB.query(Transaction).get(id)
-
+def transaction_put(**kwargs):
+    i = DB.query(Transaction).get(kwargs['id'])
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
     i.time = datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date()
@@ -280,10 +282,10 @@ def transaction_PUT(*args, **kwargs):
     # except:
     #    abort(400)
     DB.commit()
-    return {'updated': DB.query(Transaction).get(id), "previous": i}
+    return {'updated': DB.query(Transaction).get(kwargs['id']), "previous": i}
 
 #
-def balance_GET(*args, **kwargs):
+def balance_get(**kwargs):
     r = {}
     incomes = DB.query(Income).all()
 
@@ -295,7 +297,7 @@ def balance_GET(*args, **kwargs):
         except KeyError:
             r[i.currency.title] = s
     total = 0
-    for c in currency_GET():
+    for c in currency_get():
         if c['title'] in r:
             total += decimal.Decimal(c['rate'] * r[c['title']])
             r[c['title']] = r[c['title']]
@@ -313,32 +315,31 @@ def balance_GET(*args, **kwargs):
     week_sum = decimal.Decimal(0)
     tmp_results = DB.query(Transaction).join(Account).join(Currency).filter(
         and_(
-            or_(Transaction.income_id <= 0, Transaction.income_id == None),
-        and_(Transaction.sum < 0 ,
-        and_( Transaction.time >= week_begin, Transaction.time < week_end)
+            or_(Transaction.income_id <= 0, Transaction.income_id is None),
+        and_(Transaction.sum < 0,
+        and_(Transaction.time >= week_begin, Transaction.time < week_end)
         ))).all()
     
     for t in tmp_results:
         #print(t)
-        week_sum += t.sum*t.account.currency._rate().rate
+        week_sum += t.sum*t.account.currency.get_rate().rate
 
     r['weekly'] = "{}/{}".format(int(-1*week_sum), r['TOTAL'] // w )
     return r
 
 #
-def backlog_GET(*args, **kwargs):
+def backlog_get(**kwargs):
     results = []
     week_ahead = datetime.date.today() - datetime.timedelta( datetime.date.today().isoweekday() % 7 ) + datetime.timedelta(14)
     if kwargs['id'] > 0:
-        return income_GET(id=kwargs['id'], end_date=week_ahead).get_backlog()
-    for r in list(map(lambda x: x.get_backlog(), income_GET(id=0, end_date=week_ahead))):
-        for b in r:
-            results.append(b)
-    
+        return income_get(id=kwargs['id'], end_date=week_ahead).get_backlog()
+    for i in list(map(lambda x: x.get_backlog(), income_get(id=0, end_date=week_ahead))):
+        for k in i:
+            results.append(k)
     return sorted(results, key=lambda x: x['time'], reverse=True)
 
 
-def backlog_DELETE(*args, **kwargs):
+def backlog_delete(**kwargs):
     # just create transaction with sum zero
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     t = Transaction(
@@ -353,7 +354,7 @@ def backlog_DELETE(*args, **kwargs):
     return t
 
 
-def backlog_PUT(*args, **kwargs):
+def backlog_put(**kwargs):
     # actually insert transaction
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     origin_time = datetime.datetime.strptime(obj['origin_time'], '%Y-%m-%d').date()
@@ -381,12 +382,12 @@ def backlog_PUT(*args, **kwargs):
     return t
 
 
-def intervals_GET(*args, **kwargs):
+def intervals_get(**kwargs):
     """ load intervals from database """
     return DB.query(Interval).all() if kwargs['id'] == 0 else DB.query(Interval).get(kwargs['id'])
 
 
-def plan_GET(*args, **kwargs):
+def plan_get(**kwargs):
     if 'start' in kwargs:
         start_date = kwargs['start']
     else:
@@ -399,9 +400,9 @@ def plan_GET(*args, **kwargs):
             {
                 "start": start_date,
                 "horizon": horizon,
-                "intervals": intervals_GET(),
-                "currencies": currency_GET(),
-                "incomes": income_GET()
+                "intervals": intervals_get(),
+                "currencies": currency_get(),
+                "incomes": income_get()
             }
             }
 
@@ -414,17 +415,25 @@ s_date = datetime.date.today()
 @app.route('/api/<string:api>/<int:id>', defaults={'end_date': s_date.replace(year=(s_date.year + 1))}, methods=['GET', 'DELETE', 'PUT'])
 @app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date - datetime.timedelta( s_date.isoweekday() % 7 )}, methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
-def dispatcher(*args, **kwargs):
-    try:
-        start_date = datetime.datetime.strptime(
-            kwargs['start_date'], '%Y-%m-%d').date()
-    except:
-        start_date = datetime.date.today()
-    try:
-        end_date = datetime.datetime.strptime(
-            kwargs['end_date'], '%Y-%m-%d').date()
-    except:
-        end_date = datetime.datetime.now().replace(
-            year=datetime.datetime.now().year + 1).date()
+def dispatcher(**kwargs):
+    if 'start_date' in kwargs and isinstance(kwargs['start_date'], datetime.date):
+        start_date = kwargs['start_date']
+    else:
+        try:
+            start_date = datetime.datetime.strptime(
+                kwargs['start_date'], '%Y-%m-%d').date()
+        except (ValueError, KeyError):
+            start_date = datetime.date.today()
+    if 'end_date' in kwargs and isinstance(kwargs['end_date'], datetime.date):
+        start_date = kwargs['end_date']
+    else:
+        try:
+            end_date = datetime.datetime.strptime(
+                kwargs['end_date'], '%Y-%m-%d').date()
+        except (ValueError, KeyError):
+            end_date = datetime.datetime.now().replace(
+                year=datetime.datetime.now().year + 1).date()
     kwargs.update({'start_date': start_date, 'end_date': end_date})
-    return json.dumps(globals()["{}_{}".format(kwargs['api'], request.method)](*args, **kwargs), default=json_serial)
+    return json.dumps(globals()["{}_{}".format(
+            kwargs['api'],
+            str(request.method).lower())](**kwargs), default=json_serial)
