@@ -8,12 +8,12 @@ import json
 import csv
 import datetime
 import decimal
-from .utils import number_of_weeks
-from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
 from flask import Flask, request, session, redirect, url_for, \
     render_template, flash
 
 from sqlalchemy import func, and_, or_
+from .utils import number_of_weeks
+from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
@@ -128,10 +128,8 @@ def currency_get(**kwargs):
         except TypeError:
             return {}
     else:
-        rates = DB.query(Rate.currency_b,
-            Rate,
-            func.max(Rate.rate_date)
-            ).group_by(Rate.currency_b).all()
+        rates = DB.query(
+            Rate.currency_b, Rate, func.max(Rate.rate_date)).group_by(Rate.currency_b).all()
         for rate in rates:
             entries.append(rate[1].to_dict())
     return entries
@@ -188,7 +186,10 @@ def income_put(**kwargs):
 
 #
 def account_get(**kwargs):
-    return DB.query(Account).filter(Account.deleted == 'n').all() if kwargs['id'] == 0 else DB.query(Account).get(kwargs['id'])
+    if kwargs['id'] == 0:
+        return DB.query(Account).filter(Account.deleted == 'n').all()
+    else:
+        return DB.query(Account).get(kwargs['id'])
 
 
 def account_delete(**kwargs):
@@ -208,7 +209,7 @@ def account_post(**kwargs):
     new_account = Account(title=obj['title'], currency_id=int(obj['currency.id']))
     DB.add(new_account)
     DB.flush()
-    if (float(obj['sum']) > 0):
+    if float(obj['sum']) > 0:
         DB.add(Transaction(account_id=new_account.id,
                            show=obj['show'],
                            comment='initial summ',
@@ -308,29 +309,30 @@ def balance_get(**kwargs):
         '%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
     r['weeks'] = w
     today = datetime.date.today()
-    
-    week_begin = today - datetime.timedelta( today.isoweekday() % 7 ) # sunday
+    week_begin = today - datetime.timedelta(today.isoweekday() % 7) # sunday
     week_end = week_begin + datetime.timedelta(7)
     # print(week_begin, week_end)
     week_sum = decimal.Decimal(0)
     tmp_results = DB.query(Transaction).join(Account).join(Currency).filter(
-        and_(
-            or_(Transaction.income_id <= 0, Transaction.income_id is None),
-        and_(Transaction.sum < 0,
-        and_(Transaction.time >= week_begin, Transaction.time < week_end)
-        ))).all()
-    
-    for t in tmp_results:
-        #print(t)
-        week_sum += t.sum*t.account.currency.get_rate().rate
+        and_(or_(Transaction.income_id <= 0, Transaction.income_id is None),
+             and_(Transaction.sum < 0,
+                  and_(Transaction.time >= week_begin, Transaction.time < week_end)
+                 )
+            )).all()
 
-    r['weekly'] = "{}/{}".format(int(-1*week_sum), r['TOTAL'] // w )
+    for k in tmp_results:
+        #print(t)
+        week_sum += k.sum*k.account.currency.get_rate().rate
+
+    r['weekly'] = "{}/{}".format(int(-1*week_sum), r['TOTAL'] // w)
     return r
 
 #
 def backlog_get(**kwargs):
     results = []
-    week_ahead = datetime.date.today() - datetime.timedelta( datetime.date.today().isoweekday() % 7 ) + datetime.timedelta(14)
+    week_ahead = datetime.date.today() \
+        - datetime.timedelta(datetime.date.today().isoweekday() % 7)\
+        + datetime.timedelta(14)
     if kwargs['id'] > 0:
         return income_get(id=kwargs['id'], end_date=week_ahead).get_backlog()
     for i in list(map(lambda x: x.get_backlog(), income_get(id=0, end_date=week_ahead))):
@@ -404,7 +406,7 @@ def plan_get(**kwargs):
                 "currencies": currency_get(),
                 "incomes": income_get()
             }
-            }
+           }
 
 
 s_date = datetime.date.today()
@@ -412,10 +414,15 @@ s_date = datetime.date.today()
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
-@app.route('/api/<string:api>/<int:id>', defaults={'end_date': s_date.replace(year=(s_date.year + 1))}, methods=['GET', 'DELETE', 'PUT'])
-@app.route('/api/<string:api>/<int:id>/<string:end_date>', defaults={'start_date': s_date - datetime.timedelta( s_date.isoweekday() % 7 )}, methods=['GET'])
+@app.route('/api/<string:api>/<int:id>',
+           defaults={'end_date': s_date.replace(year=(s_date.year + 1))},
+           methods=['GET', 'DELETE', 'PUT'])
+@app.route('/api/<string:api>/<int:id>/<string:end_date>',
+           defaults={'start_date': s_date - datetime.timedelta(s_date.isoweekday() % 7)},
+           methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(**kwargs):
+    """ main dispatcher """
     if 'start_date' in kwargs and isinstance(kwargs['start_date'], datetime.date):
         start_date = kwargs['start_date']
     else:
@@ -425,7 +432,7 @@ def dispatcher(**kwargs):
         except (ValueError, KeyError):
             start_date = datetime.date.today()
     if 'end_date' in kwargs and isinstance(kwargs['end_date'], datetime.date):
-        start_date = kwargs['end_date']
+        end_date = kwargs['end_date']
     else:
         try:
             end_date = datetime.datetime.strptime(
@@ -435,5 +442,5 @@ def dispatcher(**kwargs):
                 year=datetime.datetime.now().year + 1).date()
     kwargs.update({'start_date': start_date, 'end_date': end_date})
     return json.dumps(globals()["{}_{}".format(
-            kwargs['api'],
-            str(request.method).lower())](**kwargs), default=json_serial)
+        kwargs['api'],
+        str(request.method).lower())](**kwargs), default=json_serial)

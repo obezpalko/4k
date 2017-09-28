@@ -81,7 +81,7 @@ class Rate(Base):
     rate = Column(Numeric(12, 2), nullable=False)
 
     def __repr__(self):
-        return "{}={:.4f}*{}".format(self.b,  self.rate, self.a)
+        return "{}={:.4f}*{}".format(self.b, self.rate, self.a)
 
     def to_dict(self):
         return {
@@ -144,15 +144,16 @@ class Income(Base):
             'currency': self.currency,
             'sum': self.sum,
             'start_date': self.start_date.isoformat(),
-            'end_date': (None if self.end_date == None else self.end_date.isoformat()),
+            'end_date': (None if self.end_date is None else self.end_date.isoformat()),
             'period': self.period
         }
 
     def get_backlog(self, max_date=date.today().replace(month=(date.today().month + 1))):
         backlog = []
+
         (last_payment,) = DB.query(func.max(Transaction.time)).filter(
             Transaction.income_id == self.id).first()
-        if last_payment == None:
+        if last_payment is None:
             last_payment = self.start_date
         else:
             last_payment = last_payment + timedelta(1)
@@ -173,6 +174,9 @@ class Income(Base):
         _start_date = max(start_date, self.start_date)
 
         if self.end_date:
+            # print(self.end_date, _start_date)
+            if self.end_date < _start_date:
+                return []
             _end_date = min(end_date, self.end_date)
         else:
             _end_date = end_date
@@ -180,19 +184,20 @@ class Income(Base):
             return []
         if _start_date == self.start_date:
             list_dates.append(_start_date)
-
+        
         _next_date = next_date(self.start_date, (self.period.value, self.period.item))
+        # print(_start_date, _end_date, _next_date)
         while _next_date <= _end_date:
             if _next_date >= _start_date and _next_date <= _end_date:
                 #s += int(self.sum)
                 list_dates.append(_next_date)
             _next_date = next_date(_next_date, (self.period.value, self.period.item))
-
+        # print(list_dates)
         pf_dates = DB.query(Payforward.income_date).filter(
-            and_(
-                Payforward.income_date > _start_date,
-                Payforward.income_date < _end_date)).all()
-        
+            and_(Payforward.income_id == self.id,
+                 and_(Payforward.income_date >= _start_date,
+                      Payforward.income_date <= _end_date))).all()
+        # print(pf_dates)
         for i, in pf_dates:
             try:
                 list_dates.remove(i)
