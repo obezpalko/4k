@@ -259,8 +259,21 @@ def transaction_post(**kwargs):
         transfer=int(obj['transfer']),
         income_id=int(obj['income.id']),
         comment=obj['comment']
-    )
+     )
     DB.add(i)
+    if 'new_account.id' in obj:
+        transfer = Transaction(
+            time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
+            account_id=int(obj['new_account.id']),
+            sum=decimal.Decimal(obj['new_sum']),
+            transfer=int(obj['transfer']),
+            income_id=int(obj['income.id']),
+            comment=obj['comment']
+        )
+        DB.add(transfer)
+        DB.flush()
+        i.transfer = transfer.id
+        transfer.transfer = i.id
     DB.flush()
     DB.commit()
     # except:
@@ -287,45 +300,50 @@ def transaction_put(**kwargs):
 
 #
 def balance_get(**kwargs):
-    r = {}
-    incomes = DB.query(Income).all()
-
-    for i in incomes:
-        s = i.get_sum(start_date=kwargs['start_date'],
-                      end_date=kwargs['end_date'])
+    """
+    return balance forecast for dates
+    """
+    balance = {}
+    incomes = DB.query(Income).filter(
+        and_(Income.start_date <= kwargs['end_date'],
+            or_(Income.end_date >= kwargs['start_date'], Income.end_date == None)))
+    for i in incomes.all():
+        _sum = i.get_sum(start_date=kwargs['start_date'],
+                         end_date=kwargs['end_date'],
+                         ignore_pf=True)
         try:
-            r[i.currency.title] += s
+            balance[i.currency.title] += _sum
         except KeyError:
-            r[i.currency.title] = s
+            balance[i.currency.title] = _sum
     total = 0
-    for c in currency_get():
-        if c['title'] in r:
-            total += decimal.Decimal(c['rate'] * r[c['title']])
-            r[c['title']] = r[c['title']]
-    r['TOTAL'] = int(total)
-    r['start_date'] = kwargs['start_date']
-    r['end_date'] = kwargs['end_date']
-    w = number_of_weeks(kwargs['start_date'].strftime(
-        '%Y-%m-%d'), kwargs['end_date'].strftime('%Y-%m-%d'))
-    r['weeks'] = w
+    for currency in currency_get():
+        if currency['title'] in balance:
+            total += decimal.Decimal(currency['rate'] * balance[currency['title']])
+            balance[currency['title']] = balance[currency['title']]
+    balance['TOTAL'] = int(total)
+    balance['start_date'] = kwargs['start_date']
+    balance['end_date'] = kwargs['end_date']
+    balance['weeks'] = number_of_weeks(
+        kwargs['start_date'].strftime('%Y-%m-%d'),
+        kwargs['end_date'].strftime('%Y-%m-%d'))
     today = datetime.date.today()
     week_begin = today - datetime.timedelta(today.isoweekday() % 7) # sunday
     week_end = week_begin + datetime.timedelta(7)
-    # print(week_begin, week_end)
     week_sum = decimal.Decimal(0)
     tmp_results = DB.query(Transaction).join(Account).join(Currency).filter(
-        and_(or_(Transaction.income_id <= 0, Transaction.income_id is None),
-             and_(Transaction.sum < 0,
-                  and_(Transaction.time >= week_begin, Transaction.time < week_end)
+        and_(or_(Transaction.transfer == None, Transaction.transfer <= 0),
+             and_(or_(Transaction.income_id <= 0, Transaction.income_id == None),
+                  and_(Transaction.sum < 0,
+                       and_(Transaction.time >= week_begin, Transaction.time < week_end)
+                      )
                  )
             )).all()
 
     for k in tmp_results:
-        #print(t)
-        week_sum += k.sum*k.account.currency.get_rate().rate
+        week_sum += k.sum * k.account.currency.get_rate().rate
 
-    r['weekly'] = "{}/{}".format(int(-1*week_sum), r['TOTAL'] // w)
-    return r
+    balance['weekly'] = "{}/{}".format(int(-1*week_sum), balance['TOTAL'] // balance['weeks'])
+    return balance
 
 #
 def backlog_get(**kwargs):
@@ -357,31 +375,33 @@ def backlog_delete(**kwargs):
 
 
 def backlog_put(**kwargs):
-    # actually insert transaction
+    """
+    actually insert transaction
+    """
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     origin_time = datetime.datetime.strptime(obj['origin_time'], '%Y-%m-%d').date()
     operation_time = datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date()
 
-    t = Transaction(
+    transaction = Transaction(
         time=operation_time,
         account_id=int(obj['account.id']),
         sum=obj['sum'],
         income_id=obj['income.id'],
         comment=obj['comment'])
-    DB.add(t)
+    DB.add(transaction)
     DB.flush()
-    if origin_time > operation_time:
+    if origin_time != operation_time:
         # payment before
         DB.add(
             Payforward(
                 income_id=int(obj['income.id']),
                 income_date=origin_time,
                 payment_date=operation_time,
-                transaction_id=t.id
+                transaction_id=transaction.id
             )
         )
     DB.commit()
-    return t
+    return transaction
 
 
 def intervals_get(**kwargs):
@@ -409,16 +429,21 @@ def plan_get(**kwargs):
            }
 
 
-s_date = datetime.date.today()
 
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
 @app.route('/api/<string:api>/<int:id>',
-           defaults={'end_date': s_date.replace(year=(s_date.year + 1))},
+           defaults={
+               'end_date': datetime.date.today().replace(
+                   year=(datetime.date.today().year + 1))
+                    },
            methods=['GET', 'DELETE', 'PUT'])
 @app.route('/api/<string:api>/<int:id>/<string:end_date>',
-           defaults={'start_date': s_date - datetime.timedelta(s_date.isoweekday() % 7)},
+           defaults={
+               'start_date': datetime.date.today() - datetime.timedelta(
+                   datetime.date.today().isoweekday() % 7)
+                    },
            methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(**kwargs):
@@ -430,7 +455,7 @@ def dispatcher(**kwargs):
             start_date = datetime.datetime.strptime(
                 kwargs['start_date'], '%Y-%m-%d').date()
         except (ValueError, KeyError):
-            start_date = datetime.date.today()
+            start_date = datetime.date.today() - datetime.timedelta(datetime.date.today().isoweekday() % 7)
     if 'end_date' in kwargs and isinstance(kwargs['end_date'], datetime.date):
         end_date = kwargs['end_date']
     else:

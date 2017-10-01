@@ -24,7 +24,7 @@
         <li><a href="#tab-transactions">transactions</a></li>
         <li><a href="#tab-accounts">accounts</a></li>
        </ul>
-       <div id=tab-week>
+      <div id=tab-week>
           <table  class=entries id=weeks_table>
               <tr class=table_header>
                 <th class="hidden">id</th>
@@ -188,7 +188,7 @@
   <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="income">
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
-      <dt>Title</dt><dd><input type=text size=30 name=title class=form_save></dd>
+      <dt>Title</dt><dd><input type=text size=15 name=title class=form_save></dd>
       <dt>Currency</dt><dd><select name=currency.id class="form_save currency_selector"></select></dd>
       <dt>Summ</dt><dd><input name=sum size=11 class=form_save></dd>
       <dt>Dates</dt><dd><input name=start_date size=11 class="set_today form_save datepicker"> <input name=end_date size=11 class="form_save datepicker"></dd>
@@ -199,7 +199,7 @@
   <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="account">
       <dl>
         <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
-        <dt>Title</dt><dd><input type=text size=30 name=title class=form_save value=""></dd>
+        <dt>Title</dt><dd><input type=text size=15 name=title class=form_save value=""></dd>
         <dt>Currency</dt><dd><select name=currency.id class="currency currency_selector form_save"></select></dd>
         <dt>Visible</dt><dd><select name=show class=form_save><option value=y>y</option><option value=n>n</option></select></dd>
         <dt>Summ</dt><dd><input name=sum class=form_save size=10></dd>
@@ -209,15 +209,18 @@
   <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="transaction">
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
-      <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
-      <dt class="hidden transfer">New Summ</dt><dd class="hidden transfer"><input name=new_sum class="" size=11></dd>
+      <dt>Summ</dt>
+        <dd>
+          <input name=sum class=form_save size=11> 
+          <input name=new_sum class="hidden transfer" size=11>
+          </dd>
       <dt>Time</dt><dd><input type=text size=11 name=time class="set_today form_save datepicker"></dd>
-      <dt>Account</dt>
+      <dt>Account <span class="ui-icon ui-icon-link transfer-button" onclick="prepare_transfer(event)"></span></dt>
         <dd>
           <select name=account.id class="form_save account_selector"></select>
-          <span class="ui-icon ui-icon-link" onclick="prepare_transfer(event)"></span>
-         </dd>
-      <dt class="hidden transfer">To account</dt><dd class="hidden transfer"><select name=new_account.id class="account_selector"></select></dd>
+          <select name=new_account.id class="transfer hidden account_selector"></select>
+          
+          </dd>
       <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
       <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
       <dt>Income_id</dt><dd><input name=income.id class=form_save value=0 disabled></input></dd>    
@@ -229,12 +232,22 @@
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>
       <dt>Time</dt><dd><input type=text size=11 name=time class="set_today form_save datepicker">
-      <input type=text size=30 name=origin_time class="set_today form_save datepicker hidden" disabled></dd>
+      <input type=text size=11 name=origin_time class="set_today form_save datepicker hidden" disabled></dd>
       <dt>Account</dt><dd><select name=account.id class="form_save account_selector"></select></dd>
       <dt>Comment</dt><dd><input name=comment class=form_save></input></dd>
       <dt>Transfer</dt><dd><input name=transfer class=form_save value=0 disabled></input></dd>
       <dt>Income_id</dt><dd><input name=income.id class=form_save value=0 disabled></input></dd>    
       </dl>
     </form>
+
+  <dl class=hidden id=transfer-dialog>
+    <dt>From Account</dt>
+      <dd><select name=account.name class=account_selector></select></dd>
+    <dt>To Account</dt>
+      <dd><select name=transfer.account class=account_selector></select></dd>
+    <dt>Sum</dt>
+      <dd><input name=transfer.sum ></dd>
+  </dl>
+
  </div>
 {% endblock %}

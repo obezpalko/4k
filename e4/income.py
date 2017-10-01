@@ -165,10 +165,13 @@ class Income(Base):
                 'sum': self.sum,
                 'income': self,
                 'comment': ''
-            })  # Transaction(time=d, account_id=0, sum=self.sum, income_id=self.id, comment=self.title))
+            })
         return backlog
 
-    def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1))):
+    def get_dates(self,
+                  start_date=date.today(),
+                  end_date=date.today().replace(year=(date.today().year+1)),
+                  ignore_pf=False):
         list_dates = []
         # s = 0
         _start_date = max(start_date, self.start_date)
@@ -184,7 +187,7 @@ class Income(Base):
             return []
         if _start_date == self.start_date:
             list_dates.append(_start_date)
-        
+
         _next_date = next_date(self.start_date, (self.period.value, self.period.item))
         # print(_start_date, _end_date, _next_date)
         while _next_date <= _end_date:
@@ -193,6 +196,8 @@ class Income(Base):
                 list_dates.append(_next_date)
             _next_date = next_date(_next_date, (self.period.value, self.period.item))
         # print(list_dates)
+        if ignore_pf:
+            return list_dates
         pf_dates = DB.query(Payforward.income_date).filter(
             and_(Payforward.income_id == self.id,
                  and_(Payforward.income_date >= _start_date,
@@ -208,15 +213,17 @@ class Income(Base):
     def get_sum(
             self,
             start_date=date.today(),
-            end_date=date.today().replace(year=(date.today().year + 1))):
+            end_date=date.today().replace(year=(date.today().year + 1)), 
+            ignore_pf=False):
         try:
-            return len(self.get_dates(start_date, end_date)) * int(self.sum)
+            return len(self.get_dates(start_date, end_date, ignore_pf)) * int(self.sum)
         except IndexError:
             return 0
 
 
 class Account(Base):
     """
+    accounts
     """
     __tablename__ = 'accounts'
     id = Column(Integer, primary_key=True)
