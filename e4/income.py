@@ -142,7 +142,7 @@ class Income(Base):
             'id': self.id,
             'title': self.title,
             'currency': self.currency,
-            'sum': self.sum,
+            'sum': "{:.2f}".format(self.sum),
             'start_date': self.start_date.isoformat(),
             'end_date': (None if self.end_date is None else self.end_date.isoformat()),
             'period': self.period
@@ -162,7 +162,7 @@ class Income(Base):
                 'id': 0,
                 'time': i,
                 'origin_time': i,
-                'sum': self.sum,
+                'sum': "{:.2f}".format(self.sum),
                 'income': self,
                 'comment': ''
             })
@@ -240,7 +240,7 @@ class Account(Base):
             'id': self.id,
             'title': self.title,
             'currency': self.currency,
-            'sum': self.sum(),
+            'sum': "{:.2f}".format(self.sum()),
             'show': self.show,
             'deleted': self.deleted
         }
@@ -310,7 +310,7 @@ class Transaction(Base):
             "id": self.id,
             "time": self.time.isoformat(),
             "account": self.account,
-            "sum": self.sum,
+            "sum": "{:.2f}".format(self.sum),
             "transfer": self.transfer,
             "income": self.income,
             "comment": self.comment
@@ -343,7 +343,3 @@ Base.metadata.create_all(engine)
 
 DB = session()
 
-
-if __name__ == '__main__':
-    import sys
-    sys.exit()

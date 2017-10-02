@@ -1,4 +1,5 @@
 # TODO list
 
-* goals
-* transfers between accounts
+* goals as specific accounts
+* transfers between accounts (deleting)
+* credit payments (calculate dates, counts and create all required transactions)
