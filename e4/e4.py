@@ -11,7 +11,7 @@ import decimal
 from flask import Flask, request, session, redirect, url_for, \
     render_template, flash
 
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, desc
 from .utils import number_of_weeks
 from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
 
@@ -244,9 +244,9 @@ def transaction_delete(**kwargs):
 def transaction_get(**kwargs):
     """ load intervals from database """
     if kwargs['id'] == 0:
-        return DB.query(Transaction).order_by(Transaction.time).all()
+        return DB.query(Transaction).order_by(desc(Transaction.time)).limit(50).from_self().order_by(Transaction.time).all()
     else:
-        return DB.query(Transaction).order_by(Transaction.time).get(kwargs['id'])
+        return DB.query(Transaction).order_by(desc(Transaction.time)).get(kwargs['id'])
 
 
 def transaction_post(**kwargs):
