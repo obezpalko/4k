@@ -47,7 +47,6 @@ function c_update(url){
         items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );
       }
     });
-    get_balance(balance_url);
     $("#currencies").html(items.join( "" ));
     $("#currency_refresh").show();
   })
