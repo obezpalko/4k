@@ -3,11 +3,13 @@
 <script>
   $( function() {
     $( "#tabs" ).tabs();
+    get_balance(balance_url);
   } );
   </script>
 
 {% endblock %}
 {% block body %}
+    {% if session.logged_in %}
 <div  style="overflow: hidden;">
     <div id=balance style="width:15%; float: left;">
       <dl class=balance></dl>
@@ -250,4 +252,5 @@
   </dl>
 
  </div>
+    {% endif %}
 {% endblock %}

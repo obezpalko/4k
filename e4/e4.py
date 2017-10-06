@@ -25,6 +25,7 @@ app.config.update(dict(
     USERNAME='admin',
     PASSWORD='NieniarcEgHiacHeulijkikej',
     HORIZON='12m',
+    PREFERRED_URL_SCHEME='https',
     SQLALCHEMY_DATABASE_URI='sqlite:///e4.db'
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
@@ -79,7 +80,7 @@ def update_rates():
 
     try:
         if request.method == 'GET':
-            return redirect(url_for('dispatcher', api='currency'))
+            return redirect(url_for('dispatcher', api='currency', _external=True, _scheme='https'))
         return True
     except RuntimeError:
         return True
@@ -107,7 +108,7 @@ def login():
         else:
             session['logged_in'] = True
             flash('You were logged in')
-            return redirect(url_for('show_incomes'))
+            return redirect(url_for('show_incomes', _external=True, _scheme='https'))
     return render_template('login.html', error=error)
 
 
@@ -115,7 +116,7 @@ def login():
 def logout():
     session.pop('logged_in', None)
     flash('You were logged out')
-    return redirect(url_for('show_entries'))
+    return redirect(url_for('show_entries', _external=True, _scheme='https'))
 
 #
 def currency_get(**kwargs):
