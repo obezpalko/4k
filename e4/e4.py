@@ -307,7 +307,7 @@ def balance_get(**kwargs):
     balance = {}
     incomes = DB.query(Income).filter(
         and_(Income.start_date <= kwargs['end_date'],
-            or_(Income.end_date >= kwargs['start_date'], Income.end_date == None)))
+             or_(Income.end_date >= kwargs['start_date'], Income.end_date == None)))
     for i in incomes.all():
         _sum = i.get_sum(start_date=kwargs['start_date'],
                          end_date=kwargs['end_date'],

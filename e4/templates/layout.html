@@ -61,7 +61,8 @@ function reload_all() {
   get_balance(balance_url);
  }
 
-$( document ).ready( function() { 
+$( document ).ready( function() {
+  var balance_url;
   reload_all();
   update_option('.account_selector', '/api/account',['title', 'currency']);
   update_option('.period_selector', '/api/intervals');
@@ -72,7 +73,7 @@ $( document ).ready( function() {
     a[$(this).attr('name')] = $(this).val();
     a[$(this).siblings('input').attr('name')] = $(this).siblings('input').val();
     balance_url = '/api/balance/0/'+a['start_date']+'/'+a['end_date'];
-    get_balance('/api/balance/0/'+a['start_date']+'/'+a['end_date']);
+    get_balance(balance_url);
   });
   get_balance(balance_url);
  });
