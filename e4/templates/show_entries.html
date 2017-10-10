@@ -1,13 +1,4 @@
 {% extends "layout.html" %}
-{% block js %}
-<script>
-  $( function() {
-    $( "#tabs" ).tabs();
-    get_balance(balance_url);
-  } );
-  </script>
-
-{% endblock %}
 {% block body %}
     {% if session.logged_in %}
 <div  style="overflow: hidden;">
@@ -21,7 +12,7 @@
     <div id=tabs style="width:70%; overflow: hidden;">
       <ul>
         <li><a href="#tab-week">this week</a></li>
-        <li><a href="#tab-backlog">backlog</a></li>
+        <li><a href="#tab-backlogs">backlogs</a></li>
         <li><a href="#tab-incomes">incomes</a></li>
         <li><a href="#tab-transactions">transactions</a></li>
         <li><a href="#tab-accounts">accounts</a></li>
@@ -84,7 +75,7 @@
                 </tr>
           </table>
        </div>
-      <div id=tab-backlog >
+      <div id=tab-backlogs >
           <table class=entries id=backlogs_table>
               <tr class=table_header>
                   <th class="hidden">id</th>
@@ -96,7 +87,7 @@
                   <th>income</th>
                   <th>comment</th>
                   <th>
-                    <span href=# onclick="update_row(event, 'backlog', true);" class="ui-icon ui-icon-document"></span>
+                    <span href=# onclick="update_row(event, 'backlogs', true);" class="ui-icon ui-icon-document"></span>
                     </th>
                   </tr>
                   <tr class="template hidden">
@@ -110,7 +101,7 @@
                       <td class="hidden row_update" name=income.id></td>
                       <td><span class=row_update name=income.title></span></td>
                       <td class=row_update name=comment></td>
-                      <td><span onclick="update_row(event, 'backlog'); load_table('backlogs_table','/api/backlog');" class="ui-icon ui-icon-pencil"></span></td>
+                      <td><span onclick="update_row(event, 'backlogs'); load_table('backlogs_table','/api/backlogs');" class="ui-icon ui-icon-pencil"></span></td>
                       </tr>
       
                   </table>
@@ -229,7 +220,7 @@
       </dl>
     </form>
 
-  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="backlog">
+  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="backlogs">
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Summ</dt><dd><input name=sum class=form_save size=11></dd>

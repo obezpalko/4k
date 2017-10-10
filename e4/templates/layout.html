@@ -53,30 +53,8 @@ var balance_url;
 var d = new Date();
 balance_url = '/api/balance/0/' + getFirstWeek(d) + '/' + addMonths(getFirstWeek(d), 6 );
 
-function reload_all() {
-  load_table('backlogs_table', '/api/backlog');
-  load_table('incomes_table', '/api/income');
-  load_table('transactions_table', '/api/transaction');
-  load_table('accounts_table', '/api/account');
-  get_balance(balance_url);
- }
 
-$( document ).ready( function() {
-  var balance_url;
-  reload_all();
-  update_option('.account_selector', '/api/account',['title', 'currency']);
-  update_option('.period_selector', '/api/intervals');
-  update_option('.currency_selector', '/api/currency');
-  c_update('/api/currency');
-  $('#balance input').change(function(event){
-    var a = {'start_date':'', 'end_date':''};
-    a[$(this).attr('name')] = $(this).val();
-    a[$(this).siblings('input').attr('name')] = $(this).siblings('input').val();
-    balance_url = '/api/balance/0/'+a['start_date']+'/'+a['end_date'];
-    get_balance(balance_url);
-  });
-  get_balance(balance_url);
- });
+
 
 function load_table(table_name, url){
   $('#' + table_name + ' tr').not('.template').not('.table_header').remove();
@@ -134,6 +112,7 @@ function get_balance(url){
     c.push('<dt>weeks</dt>');
     c.push('<dt>weekly</dt>');
     $('#balance dl.balance').html(c.join(''));
+
     $.getJSON(url, function(data){
       $.each(data, function(key, val){
         $('#balance dt').each(function(){
@@ -145,7 +124,7 @@ function get_balance(url){
           $('#balance input.'+key).val(val);
         };
       });
-      $.getJSON('/api/account', function(data){
+      $.getJSON('/api/accounts', function(data){
         var c = []
         $.each(data, function(k, v){
           if (v['show'] == 'y'  ) { 
@@ -309,23 +288,42 @@ function update_row(event, to_update, clean=false){
 
  }
 
+ function reload_all() {
+  load_table('backlogs_table', '/api/backlogs');
+  load_table('incomes_table', '/api/incomes');
+  load_table('transactions_table', '/api/transactions');
+  load_table('accounts_table', '/api/accounts');
+  get_balance(balance_url);
+ }
 
 $( function() {
-    $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });
-
+  $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });
+  $( "#tabs" ).tabs();
+  console.log('start');
+  $('.ui-tabs-anchor').click(function(){
+    load_table($(this).text()+'_table', '/api/'+$(this).text());
+    //alert($(this).text());
+  });  
+  get_balance(balance_url);
+  //reload_all();
+  update_option('.account_selector', '/api/accounts',['title', 'currency']);
+  update_option('.period_selector', '/api/intervals');
+  update_option('.currency_selector', '/api/currency');
+  c_update('/api/currency');
+  $('#balance input').change(function(event){
+    var a = {'start_date':'', 'end_date':''};
+    a[$(this).attr('name')] = $(this).val();
+    a[$(this).siblings('input').attr('name')] = $(this).siblings('input').val();
+    balance_url = '/api/balance/0/'+a['start_date']+'/'+a['end_date'];
+    get_balance(balance_url);
+  });
+  
  });
 
 </script>
 {% block js %}
 {% endblock %}
 <body>
-
-
-<!--
-<div class=accounts>    
-<ul id="accounts"></ul>
-</div>
--->
 
 <div class=page>
   <h1>E4</h1>

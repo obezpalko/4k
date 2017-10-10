@@ -88,13 +88,12 @@ def update_rates():
 
 @app.route('/')
 @app.route('/incomes')
-@app.route('/income')
 def show_incomes():
     return render_template('show_entries.html',
-                           entries=list(map(lambda x: x.to_dict(), income_get(id=0))),
+                           entries=list(map(lambda x: x.to_dict(), incomes_get(id=0))),
                            currencies=currency_get(id=0),
                            periods=intervals_get(id=0),
-                           transactions=list(map(lambda x: x.to_dict(), transaction_get(id=0))))
+                           transactions=list(map(lambda x: x.to_dict(), transactions_get(id=0))))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -136,17 +135,17 @@ def currency_get(**kwargs):
     return entries
 
 #
-def income_delete(**kwargs):
+def incomes_delete(**kwargs):
     DB.query(Income).filter_by(id=kwargs['id']).delete()
     DB.commit()
     return {'deleted': kwargs['id']}
 
 
-def income_get(**kwargs):
+def incomes_get(**kwargs):
     return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
 
 
-def income_post(**kwargs):
+def incomes_post(**kwargs):
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
     i = Income(
@@ -167,7 +166,7 @@ def income_post(**kwargs):
     return i
 
 
-def income_put(**kwargs):
+def incomes_put(**kwargs):
     i = DB.query(Income).get(kwargs['id'])
 
     obj = json.loads(request.data.decode('utf-8', 'strict'))
@@ -186,14 +185,14 @@ def income_put(**kwargs):
     return {'updated': DB.query(Income).get(kwargs['id']), "previous": i}
 
 #
-def account_get(**kwargs):
+def accounts_get(**kwargs):
     if kwargs['id'] == 0:
         return DB.query(Account).filter(Account.deleted == 'n').all()
     else:
         return DB.query(Account).get(kwargs['id'])
 
 
-def account_delete(**kwargs):
+def accounts_delete(**kwargs):
     income = DB.query(Account).get(kwargs['id'])
     if DB.query(Transaction).filter(Transaction.account_id == kwargs['id']).count() > 0:
         income.deleted = 'y'
@@ -204,7 +203,7 @@ def account_delete(**kwargs):
     return {'deleted': kwargs['id']}
 
 
-def account_post(**kwargs):
+def accounts_post(**kwargs):
     """ add new account and set first transaction with rests of money """
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     new_account = Account(title=obj['title'], currency_id=int(obj['currency.id']))
@@ -220,7 +219,7 @@ def account_post(**kwargs):
     return new_account
 
 
-def account_put(**kwargs):
+def accounts_put(**kwargs):
     a = DB.query(Account).get(kwargs['id'])
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     a.title = obj['title']
@@ -235,14 +234,14 @@ def account_put(**kwargs):
     return {'updated': DB.query(Account).get(kwargs['id']), "previous": a}
 
 #
-def transaction_delete(**kwargs):
+def transactions_delete(**kwargs):
     income = DB.query(Transaction).filter_by(id=kwargs['id']).delete()
     DB.query(Payforward).filter_by(transaction_id=kwargs['id']).delete()
     DB.commit()
     return {'deleted': income}
 
 
-def transaction_get(**kwargs):
+def transactions_get(**kwargs):
     """ load intervals from database """
     if kwargs['id'] == 0:
         return DB.query(Transaction).order_by(desc(Transaction.time)).limit(50).from_self().order_by(Transaction.time).all()
@@ -250,7 +249,7 @@ def transaction_get(**kwargs):
         return DB.query(Transaction).order_by(desc(Transaction.time)).get(kwargs['id'])
 
 
-def transaction_post(**kwargs):
+def transactions_post(**kwargs):
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
     i = Transaction(
@@ -282,7 +281,7 @@ def transaction_post(**kwargs):
     return i
 
 
-def transaction_put(**kwargs):
+def transactions_put(**kwargs):
     i = DB.query(Transaction).get(kwargs['id'])
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
@@ -347,20 +346,20 @@ def balance_get(**kwargs):
     return balance
 
 #
-def backlog_get(**kwargs):
+def backlogs_get(**kwargs):
     results = []
     week_ahead = datetime.date.today() \
         - datetime.timedelta(datetime.date.today().isoweekday() % 7)\
         + datetime.timedelta(14)
     if kwargs['id'] > 0:
-        return income_get(id=kwargs['id'], end_date=week_ahead).get_backlog()
-    for i in list(map(lambda x: x.get_backlog(), income_get(id=0, end_date=week_ahead))):
+        return incomes_get(id=kwargs['id'], end_date=week_ahead).get_backlog()
+    for i in list(map(lambda x: x.get_backlog(), incomes_get(id=0, end_date=week_ahead))):
         for k in i:
             results.append(k)
     return sorted(results, key=lambda x: x['time'], reverse=True)
 
 
-def backlog_delete(**kwargs):
+def backlogs_delete(**kwargs):
     # just create transaction with sum zero
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     t = Transaction(
@@ -375,7 +374,7 @@ def backlog_delete(**kwargs):
     return t
 
 
-def backlog_put(**kwargs):
+def backlogs_put(**kwargs):
     """
     actually insert transaction
     """
@@ -425,7 +424,7 @@ def plan_get(**kwargs):
                 "horizon": horizon,
                 "intervals": intervals_get(),
                 "currencies": currency_get(),
-                "incomes": income_get()
+                "incomes": incomes_get()
             }
            }
 
