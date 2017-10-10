@@ -126,7 +126,7 @@ function prepare_transfer(event) {
 
 function get_balance(url){
   $.getJSON('/api/currency', function(data){
-    c = [];
+    var c = [];
     $.each(data, function(c_index, currency){
       c.push('<dt>'+ currency['title'] +'</dt>')
     });
@@ -134,30 +134,30 @@ function get_balance(url){
     c.push('<dt>weeks</dt>');
     c.push('<dt>weekly</dt>');
     $('#balance dl.balance').html(c.join(''));
-  });
-  $.getJSON(url, function(data){
-    
-    $.each(data, function(key, val){
-      $('#balance dt').each(function(){
-        if ($(this).text() == key) {
-          $(this).after('<dd>'+val+'</dd>');
-        }
+    $.getJSON(url, function(data){
+      $.each(data, function(key, val){
+        $('#balance dt').each(function(){
+          if ($(this).text() == key) {
+            $(this).after('<dd>'+val+'</dd>');
+          }
+        });
+        if (['start_date', 'end_date'].indexOf(key) > -1){
+          $('#balance input.'+key).val(val);
+        };
       });
-      if (['start_date', 'end_date'].indexOf(key) > -1){
-        $('#balance input.'+key).val(val);
-      };
+      $.getJSON('/api/account', function(data){
+        var c = []
+        $.each(data, function(k, v){
+          if (v['show'] == 'y'  ) { 
+            c.push('<dt>'+v['title']+ ' ' + v['currency']['title'] +'</dt><dd>'+ v['sum'] +'</dd>');
+          }
+        });        
+        $('#balance dl.accounts').html(c.join(''));
+      });
     });
   });
-  $.getJSON('/api/account', function(data){
-    c = []
-    $.each(data, function(k, v){
-      if (v['show'] == 'y'  ) { 
-        c.push('<dt>'+v['title']+ ' ' + v['currency']['title'] +'</dt><dd>'+ v['sum'] +'</dd>');
-      }
-    });
-    
-    $('#balance dl.accounts').html(c.join(''));
-  });
+  
+
   
   $('#balance').show();  
  }
