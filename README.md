@@ -3,7 +3,7 @@
 
 1. aaa
 
-   ``` language=ini
+   ```Ini
    [production_42]
    aws_access_key_id=XXXXXXXXXXXXXXXX
    aws_secret_access_key=XXXXXXXXXXXXXXXX
