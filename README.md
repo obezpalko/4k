@@ -3,8 +3,11 @@
 
 1. aaa
 
-   ``` language=conf
-   ccc
+   ``` language=ini
+   [production_42]
+   aws_access_key_id=XXXXXXXXXXXXXXXX
+   aws_secret_access_key=XXXXXXXXXXXXXXXX
+   region=us-east-1
    ```
 
 1. bbb
