@@ -3,7 +3,7 @@
 
 1. aaa
 
-   ```
+   ``` language=conf
    ccc
    ```
 
