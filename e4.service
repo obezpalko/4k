@@ -1,0 +1,18 @@
+[Unit]
+Description=4 Envelopes uWSGI
+After=syslog.target
+
+[Service]
+ExecStart=/usr/bin/uwsgi --ini /home/obezpalko/src/4k/uwsgi.ini
+# Requires systemd version 211 or newer
+RuntimeDirectory=uwsgi
+Restart=always
+KillSignal=SIGQUIT
+Type=notify
+StandardError=syslog
+NotifyAccess=all
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
