@@ -335,7 +335,9 @@ class Payforward(Base):
     transaction = relationship("Transaction")
 
 #
-engine = create_engine("sqlite://{}/e4.db".format(dirname(realpath(__file__))))
+database_file = "sqlite://{}/e4.db".format(dirname(realpath(__file__)))
+print(database_file)
+engine = create_engine(database_file)
 session = sessionmaker()
 
 session.configure(bind=engine)
