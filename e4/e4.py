@@ -87,6 +87,9 @@ def update_rates():
     except RuntimeError:
         return True
 
+@app.cli.command('version')
+def version_get(**kargs):
+    return {'version': __version__}
 
 @app.route('/')
 @app.route('/incomes')
