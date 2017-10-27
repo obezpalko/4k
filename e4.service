@@ -7,7 +7,7 @@ ExecStart=/usr/bin/uwsgi --ini /home/obezpalko/src/4k/uwsgi.ini
 # Requires systemd version 211 or newer
 RuntimeDirectory=uwsgi
 Restart=always
-KillSignal=SIGQUIT
+KillSignal=SIGTERM
 Type=notify
 StandardError=syslog
 NotifyAccess=all
