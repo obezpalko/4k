@@ -1,9 +1,9 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python
 """
 income class
 """
 from datetime import date, timedelta
-
+from os.path import dirname, realpath
 try:
     from .utils import next_date
 except ImportError:
@@ -213,7 +213,7 @@ class Income(Base):
     def get_sum(
             self,
             start_date=date.today(),
-            end_date=date.today().replace(year=(date.today().year + 1)), 
+            end_date=date.today().replace(year=(date.today().year + 1)),
             ignore_pf=False):
         try:
             return len(self.get_dates(start_date, end_date, ignore_pf)) * int(self.sum)
@@ -335,7 +335,7 @@ class Payforward(Base):
     transaction = relationship("Transaction")
 
 #
-engine = create_engine('sqlite:///e4/e4.db')
+engine = create_engine("sqlite://{}/e4.db".format(dirname(realpath(__file__))))
 session = sessionmaker()
 
 session.configure(bind=engine)

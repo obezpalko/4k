@@ -9,7 +9,7 @@ setup(
         'flask',
         'sqlalchemy',
         'matplotlib',
-        'gunicorn'
+        'uwsgi'
     ],
     setup_requires=[
         'pytest-runner',
