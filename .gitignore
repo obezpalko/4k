@@ -103,3 +103,4 @@ ENV/
 *.csv
 e4/*.db
 e4/.sql
+4k/

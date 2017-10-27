@@ -179,11 +179,9 @@ function update_row(event, to_update, clean=false){
    });
   
   // check transfer
-
-  console.log(transfer_id);
   if ( transfer_id > 0) {
     console.log('do transfer');
-    var j = $.getJSON('/api/transaction/'+transfer_id, function(data){
+    var j = $.getJSON('/api/transactions/'+transfer_id, function(data){
       $('#'+to_update).find('[name=new_sum]').val(data['sum']).prop('disabled', true).show();
       $('#'+to_update).find('[name="new_account.id"]').val(data['account']['id']).prop('disabled', true).show();
       $('#'+to_update).find('.transfer-button').hide();
@@ -214,7 +212,7 @@ function update_row(event, to_update, clean=false){
           success: function(msg){
             row.remove();
             get_balance(balance_url);
-            reload_all();
+            // reload_all();
             
            }
         });
@@ -241,7 +239,7 @@ function update_row(event, to_update, clean=false){
               });
               
               get_balance(balance_url);
-              reload_all();
+              // reload_all();
               
             }
           });
@@ -273,7 +271,7 @@ function update_row(event, to_update, clean=false){
           template.after(new_row);
           new_row.show();
           get_balance(balance_url);
-          reload_all();
+          // reload_all();
         }
       });
       $(this).dialog( "close" );

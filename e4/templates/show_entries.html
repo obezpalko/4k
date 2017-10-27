@@ -29,7 +29,7 @@
                 <th>comment</th>
                 <th>income</th>
                 <th>
-                  <span href=# onclick="update_row(event, 'transaction', true);" class="ui-icon ui-icon-document"></span>
+                  <span href=# onclick="update_row(event, 'transactions', true);" class="ui-icon ui-icon-document"></span>
                   </th>
                 </tr>
                 <tr class="template hidden">
@@ -45,7 +45,7 @@
                       </td>
                     <td class=row_update name=comment></td>
                     <td class=row_update name=income.title></td>
-                    <td><span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span></td>
+                    <td><span onclick="update_row(event, 'transactions')" class="ui-icon ui-icon-pencil"></span></td>
                     </tr>
     
               </table>
@@ -59,7 +59,7 @@
                   <th>currency</th>
                   <th>sum</th>
                   <th>
-                    <span onclick="update_row(event, 'account', true);" class="ui-icon ui-icon-document"></span>
+                    <span onclick="update_row(event, 'accounts', true);" class="ui-icon ui-icon-document"></span>
                     </th>
                   
                 </tr>
@@ -70,7 +70,7 @@
                   <td class="money row_update" name=sum></td>
                   <td>
                     <span class="hidden row_update" name=show ></span>
-                    <span onclick="update_row(event, 'account');" class="ui-icon ui-icon-pencil"></span>
+                    <span onclick="update_row(event, 'accounts');" class="ui-icon ui-icon-pencil"></span>
                     </td>
                 </tr>
           </table>
@@ -115,7 +115,7 @@
           <th>Currency</th>
           <th>Dates</th>
           <th>
-            <span href=# onclick="update_row(event, 'income', true);" class="ui-icon ui-icon-document"></span>
+            <span href=# onclick="update_row(event, 'incomes', true);" class="ui-icon ui-icon-document"></span>
             </th>
           </tr>
         <tr class="template hidden">
@@ -135,7 +135,7 @@
             <span class=row_update name=end_date>till</span>
             </td>
           <td>
-            <span onclick="update_row(event, 'income')" class="ui-icon ui-icon-pencil"></span>
+            <span onclick="update_row(event, 'incomes')" class="ui-icon ui-icon-pencil"></span>
             </td>
           </tr>
         </table>
@@ -154,7 +154,7 @@
             <th>comment</th>
             <th>income</th>
             <th>
-              <span href=# onclick="update_row(event, 'transaction', true);" class="ui-icon ui-icon-document"></span>
+              <span href=# onclick="update_row(event, 'transactions', true);" class="ui-icon ui-icon-document"></span>
               </th>
             </tr>
             <tr class="template hidden">
@@ -170,7 +170,7 @@
                   </td>
                 <td class=row_update name=comment></td>
                 <td class=row_update name=income.title></td>
-                <td><span onclick="update_row(event, 'transaction')" class="ui-icon ui-icon-pencil"></span></td>
+                <td><span onclick="update_row(event, 'transactions')" class="ui-icon ui-icon-pencil"></span></td>
                 </tr>
 
           </table>
@@ -178,7 +178,7 @@
        </div>
   {% if session.logged_in %}
   {% endif %}
-  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="income">
+  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="incomes">
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Title</dt><dd><input type=text size=15 name=title class=form_save></dd>
@@ -189,7 +189,7 @@
       </dl>
    </form>
 
-  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="account">
+  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="accounts">
       <dl>
         <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
         <dt>Title</dt><dd><input type=text size=15 name=title class=form_save value=""></dd>
@@ -199,7 +199,7 @@
         </dl>
     </form>
   
-  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="transaction">
+  <form action="{{ url_for('dispatcher') }}" method=post class=add-entry id="transactions">
     <dl>
       <dt>ID</dt><dd><input type=text name=id class=id value="" size=4 disabled></dd>
       <dt>Summ</dt>

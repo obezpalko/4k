@@ -6,6 +6,8 @@ setup(
     include_package_data=True,
     install_requires=[
         'flask',
+        'sqlalchemy',
+        'matplotlib'
     ],
     setup_requires=[
         'pytest-runner',

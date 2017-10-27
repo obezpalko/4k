@@ -9,11 +9,13 @@ import csv
 import datetime
 import decimal
 from flask import Flask, request, session, redirect, url_for, \
-    render_template, flash
+    render_template, flash, send_file
 
 from sqlalchemy import func, and_, or_, desc
-from .utils import number_of_weeks
-from .income import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
+from .utils import number_of_weeks,  strip_numbers
+from .income import DB, Currency, Rate, Income, Interval, Transaction, \
+    Account, Payforward
+from .plot import plot_weekly_plan
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
@@ -117,7 +119,7 @@ def logout():
     flash('You were logged out')
     return redirect(url_for('show_entries', _external=True, _scheme='https'))
 
-#
+
 def currency_get(**kwargs):
     entries = []
     if 'id' in kwargs and kwargs['id']:
@@ -134,7 +136,7 @@ def currency_get(**kwargs):
             entries.append(rate[1].to_dict())
     return entries
 
-#
+
 def incomes_delete(**kwargs):
     DB.query(Income).filter_by(id=kwargs['id']).delete()
     DB.commit()
@@ -151,7 +153,7 @@ def incomes_post(**kwargs):
     i = Income(
         title=obj['title'],
         currency_id=int(obj['currency.id']),
-        sum=decimal.Decimal(obj['sum']),
+        sum=decimal.Decimal(strip_numbers(obj['sum'])),
         start_date=datetime.datetime.strptime(
             obj['start_date'], '%Y-%m-%d').date(),
         end_date=(None if obj['end_date'] == '' else datetime.datetime.strptime(
@@ -173,7 +175,7 @@ def incomes_put(**kwargs):
     # try:
     i.title = obj['title']
     i.currency_id = int(obj['currency.id'])
-    i.sum = decimal.Decimal(obj['sum'])
+    i.sum = decimal.Decimal(strip_numbers(obj['sum']))
     i.start_date = datetime.datetime.strptime(
         obj['start_date'], '%Y-%m-%d').date()
     i.end_date = (None if obj['end_date'] == '' else datetime.datetime.strptime(
@@ -184,10 +186,10 @@ def incomes_put(**kwargs):
     DB.commit()
     return {'updated': DB.query(Income).get(kwargs['id']), "previous": i}
 
-#
+
 def accounts_get(**kwargs):
     if kwargs['id'] == 0:
-        return DB.query(Account).filter(Account.deleted == 'n').all()
+        return DB.query(Account).filter(Account.deleted == 'n').order_by(Account.title).all()
     else:
         return DB.query(Account).get(kwargs['id'])
 
@@ -209,12 +211,12 @@ def accounts_post(**kwargs):
     new_account = Account(title=obj['title'], currency_id=int(obj['currency.id']))
     DB.add(new_account)
     DB.flush()
-    if float(obj['sum']) > 0:
+    if float(strip_numbers(obj['sum'])) > 0:
         DB.add(Transaction(account_id=new_account.id,
                            show=obj['show'],
                            comment='initial summ',
                            time=datetime.date.today(),
-                           sum=obj['sum']))
+                           sum=strip_numbers(obj['sum'])))
     DB.commit()
     return new_account
 
@@ -225,7 +227,7 @@ def accounts_put(**kwargs):
     a.title = obj['title']
     a.show = obj['show']
     a.currency_id = obj['currency.id']
-    delta_sum = decimal.Decimal(obj['sum']) - a.sum()
+    delta_sum = decimal.Decimal(strip_numbers(obj['sum'])) - a.sum()
     if delta_sum != 0:
         t = Transaction(time=datetime.date.today(), sum=delta_sum,
                         account_id=kwargs['id'], comment='fix account summ')
@@ -233,7 +235,7 @@ def accounts_put(**kwargs):
     DB.commit()
     return {'updated': DB.query(Account).get(kwargs['id']), "previous": a}
 
-#
+
 def transactions_delete(**kwargs):
     income = DB.query(Transaction).filter_by(id=kwargs['id']).delete()
     DB.query(Payforward).filter_by(transaction_id=kwargs['id']).delete()
@@ -244,9 +246,12 @@ def transactions_delete(**kwargs):
 def transactions_get(**kwargs):
     """ load intervals from database """
     if kwargs['id'] == 0:
-        return DB.query(Transaction).order_by(desc(Transaction.time)).limit(50).from_self().order_by(Transaction.time).all()
+        return DB.query(Transaction).order_by(
+            desc(Transaction.time)).limit(100).from_self().order_by(
+                Transaction.time).all()
     else:
-        return DB.query(Transaction).order_by(desc(Transaction.time)).get(kwargs['id'])
+        return DB.query(Transaction).order_by(
+            desc(Transaction.time)).get(kwargs['id'])
 
 
 def transactions_post(**kwargs):
@@ -255,17 +260,17 @@ def transactions_post(**kwargs):
     i = Transaction(
         time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
         account_id=int(obj['account.id']),
-        sum=decimal.Decimal(obj['sum']),
+        sum=decimal.Decimal(strip_numbers(obj['sum'])),
         transfer=int(obj['transfer']),
         income_id=int(obj['income.id']),
         comment=obj['comment']
-     )
+    )
     DB.add(i)
     if 'new_account.id' in obj:
         transfer = Transaction(
             time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
             account_id=int(obj['new_account.id']),
-            sum=decimal.Decimal(obj['new_sum']),
+            sum=decimal.Decimal(strip_numbers(obj['new_sum'])),
             transfer=int(obj['transfer']),
             income_id=int(obj['income.id']),
             comment=obj['comment']
@@ -287,7 +292,7 @@ def transactions_put(**kwargs):
     # try:
     i.time = datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date()
     i.account_id = int(obj['account.id']) if obj['account.id'] != '' else None
-    i.sum = decimal.Decimal(obj['sum'])
+    i.sum = decimal.Decimal(strip_numbers(obj['sum']))
     i.transfer = int(obj['transfer']) if obj['transfer'] not in [
         '0', ''] else None
     i.income_id = int(obj['income.id']) if obj['income.id'] not in [
@@ -298,7 +303,7 @@ def transactions_put(**kwargs):
     DB.commit()
     return {'updated': DB.query(Transaction).get(kwargs['id']), "previous": i}
 
-#
+
 def balance_get(**kwargs):
     """
     return balance forecast for dates
@@ -327,7 +332,7 @@ def balance_get(**kwargs):
         kwargs['start_date'].strftime('%Y-%m-%d'),
         kwargs['end_date'].strftime('%Y-%m-%d'))
     today = datetime.date.today()
-    week_begin = today - datetime.timedelta(today.isoweekday() % 7) # sunday
+    week_begin = today - datetime.timedelta(today.isoweekday() % 7)  # sunday
     week_end = week_begin + datetime.timedelta(7)
     week_sum = decimal.Decimal(0)
     tmp_results = DB.query(Transaction).join(Account).join(Currency).filter(
@@ -335,9 +340,9 @@ def balance_get(**kwargs):
              and_(or_(Transaction.income_id <= 0, Transaction.income_id == None),
                   and_(Transaction.sum < 0,
                        and_(Transaction.time >= week_begin, Transaction.time < week_end)
-                      )
-                 )
-            )).all()
+                       )
+                  )
+             )).all()
 
     for k in tmp_results:
         week_sum += k.sum * k.account.currency.get_rate().rate
@@ -345,7 +350,7 @@ def balance_get(**kwargs):
     balance['weekly'] = "{}/{}".format(int(-1*week_sum), balance['TOTAL'] // balance['weeks'])
     return balance
 
-#
+
 def backlogs_get(**kwargs):
     results = []
     week_ahead = datetime.date.today() \
@@ -385,7 +390,7 @@ def backlogs_put(**kwargs):
     transaction = Transaction(
         time=operation_time,
         account_id=int(obj['account.id']),
-        sum=obj['sum'],
+        sum=strip_numbers(obj['sum']),
         income_id=obj['income.id'],
         comment=obj['comment'])
     DB.add(transaction)
@@ -426,9 +431,7 @@ def plan_get(**kwargs):
                 "currencies": currency_get(),
                 "incomes": incomes_get()
             }
-           }
-
-
+            }
 
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
@@ -437,13 +440,13 @@ def plan_get(**kwargs):
            defaults={
                'end_date': datetime.date.today().replace(
                    year=(datetime.date.today().year + 1))
-                    },
+           },
            methods=['GET', 'DELETE', 'PUT'])
 @app.route('/api/<string:api>/<int:id>/<string:end_date>',
            defaults={
                'start_date': datetime.date.today() - datetime.timedelta(
                    datetime.date.today().isoweekday() % 7)
-                    },
+           },
            methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(**kwargs):
@@ -469,3 +472,14 @@ def dispatcher(**kwargs):
     return json.dumps(globals()["{}_{}".format(
         kwargs['api'],
         str(request.method).lower())](**kwargs), default=json_serial)
+
+
+@app.route('/img/<string:plot>/<string:start_date>/<string:end_date>', methods=['GET'])
+def plot_graph(**kwargs):
+    return send_file(
+        globals()["plot_{}".format(kwargs['plot'])](**kwargs),
+        'image/png')
+
+
+if __name__ == '__main__':
+    app.run()
