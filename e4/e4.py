@@ -17,6 +17,8 @@ from .income import DB, Currency, Rate, Income, Interval, Transaction, \
     Account, Payforward
 from .plot import plot_weekly_plan
 
+__version__ = "0.1"
+
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
 
@@ -87,9 +89,6 @@ def update_rates():
     except RuntimeError:
         return True
 
-@app.cli.command('version')
-def version_get(**kargs):
-    return {'version': __version__}
 
 @app.route('/')
 @app.route('/incomes')
@@ -121,6 +120,9 @@ def logout():
     session.pop('logged_in', None)
     flash('You were logged out')
     return redirect(url_for('show_entries', _external=True, _scheme='https'))
+
+def version_get(**kargs):
+    return {'version': __version__}
 
 
 def currency_get(**kwargs):
