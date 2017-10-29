@@ -65,7 +65,7 @@ function load_table(table_name, url){
       if (v['deleted']=='y') {return false;}
       new_row = template.clone(true).removeClass('template');
       new_row.find('.row_update').each(function(){
-        $(this).text(json_names($(this).attr('name'), v));
+        $(this).text(jsonnames($(this).attr('name'), v));
       });
       template.after(new_row);
       new_row.show();
@@ -235,7 +235,7 @@ function update_row(event, to_update, clean=false){
             success: function(data){
               updated=data['updated'];
               row.find('.row_update').each(function(){
-                $(this).text(json_names($(this).attr('name'), updated))
+                $(this).text(jsonnames($(this).attr('name'), updated))
               });
               
               get_balance(balance_url);
@@ -266,7 +266,7 @@ function update_row(event, to_update, clean=false){
         success: function(data){
           var new_row=template.clone(true).removeClass('template');
           new_row.find('.row_update').each(function(){
-            $(this).text(json_names($(this).attr('name'), data))
+            $(this).text(jsonnames($(this).attr('name'), data))
           });
           template.after(new_row);
           new_row.show();
@@ -304,9 +304,9 @@ $( function() {
   });  
   get_balance(balance_url);
   //reload_all();
-  update_option('.account_selector', '/api/accounts',['title', 'currency']);
-  update_option('.period_selector', '/api/intervals');
-  update_option('.currency_selector', '/api/currency');
+  updateoption('.account_selector', '/api/accounts',['title', 'currency']);
+  updateoption('.period_selector', '/api/intervals');
+  updateoption('.currency_selector', '/api/currency');
   c_update('/api/currency');
   $('#balance input').change(function(event){
     var a = {'start_date':'', 'end_date':''};

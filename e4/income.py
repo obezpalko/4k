@@ -27,7 +27,7 @@ class SqliteNumeric(types.TypeDecorator):
     @staticmethod
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(types.VARCHAR(100))
-    
+
     @staticmethod
     def process_bind_param(self, value, dialect):
         return str(value)
