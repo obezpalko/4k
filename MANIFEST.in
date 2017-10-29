@@ -1,2 +1,6 @@
 graft e4/templates
 graft e4/static
+graft python-github-webhooks/hooks
+graft e4.service
+graft uwsgi.ini
+ 
