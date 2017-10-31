@@ -1,25 +1,25 @@
 
 
-function updateoption(element, url, title_fields=['title']){
+function updateoption(element, url, titlefields=['title']){
   $.getJSON(url, function(data){
     var options = [];
     var titles;
     $.each(data, function(key, val){
       if (val["show"] !== "n" ) { 
       titles = [];
-      title_fields.forEach( function(t){ titles.push( (t==="title") ? val[t] : val[t]["title"]);});
-      options.push("<option value='"+ val["id"] + "'" + ((val["default"] === 1) ? " selected" : "") + ">" + titles.join(" ") + "</option>")
+      titlefields.forEach( function(t){ titles.push( (t==="title") ? val[t] : val[t]["title"]);});
+      options.push("<option value='"+ val["id"] + "'" + ((val["default"] === 1) ? " selected" : "") + ">" + titles.join(" ") + "</option>");
       }
     });
     $(element).html(options.join(""));
   });
 }
 
-Date.prototype.formatted = function() {
-  var mm = this.getMonth() + 1; // getMonth() is zero-based
-  var dd = this.getDate();
+function dateformatted (_date) {
+  var mm = _date.getMonth() + 1; // getMonth() is zero-based
+  var dd = _date.getDate();
 
-  return [this.getFullYear(),
+  return [_date.getFullYear(),
           (mm>9 ? "" : "0") + mm,
           (dd>9 ? "" : "0") + dd
          ].join("-");
@@ -29,7 +29,7 @@ function getSunday(_date) {
   var d = new Date(_date);
   var day = d.getDay(),
       diff = d.getDate() - day; // adjust when day is sunday
-  return new Date(d.setDate(diff)).formatted();
+  return new dateformatted(Date(d.setDate(diff)));
 }
 
 function getFirstWeek(_date) {

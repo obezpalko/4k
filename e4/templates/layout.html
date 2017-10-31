@@ -142,15 +142,15 @@ function get_balance(url){
  }
 
 
-function get_accounts(url, title_fields=['title', 'currency.title']) {
+function get_accounts(url, titlefields=["title", "currency.title"]) {
   $.getJSON(url, function(data){
     var options = [];
     $.each(data, function(key, val){
       titles = []
-      title_fields.forEach( function(t){ titles.push( (t=='title') ? val[t] : val[t]['title'])});
-      options.push('<li>'+ titles.join(' ') +'</li>')
+      titlefields.forEach( function(t){ titles.push( (t=="title") ? val[t] : val[t]["title"])});
+      options.push("<li>" + titles.join(" ") + "</li>")
     });
-    $('#accounts').html(options.join('')).show();
+    $("#accounts").html(options.join("")).show();
   })
  }
 
@@ -170,10 +170,10 @@ function update_row(event, to_update, clean=false){
     var n , v;
     n = $(this).attr('name');
     v = $(this).text().trim();
-    $('#' + to_update).find("[name='" + n + "']" ).each(function(){
+    $("#" + to_update).find("[name='" + n + "']" ).each(function(){
       $(this).val( v )
      });
-    if (n == 'transfer' && v > 0) {
+    if (n == "transfer" && v > 0) {
       transfer_id = v;
     }
    });
