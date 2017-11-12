@@ -6,7 +6,7 @@ setup(
     packages=['e4'],
     include_package_data=True,
     install_requires=[
-        'chardet2',
+        'chardet',
         'requests',
         'flask',
         'flask_login',
