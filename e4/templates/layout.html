@@ -327,6 +327,7 @@ $( function() {
   <h1>E4</h1>
     {% if session.logged_in %}
   <div>
+    <span>{{ session.email }}</span>
     <ul id="currencies" class="currencies"></ul>
     </div>
     {% endif %}
