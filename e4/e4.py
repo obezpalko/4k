@@ -6,22 +6,37 @@ import os
 import http.client
 import json
 import csv
+import re
 import datetime
 import decimal
 from flask import Flask, request, session, redirect, url_for, \
     render_template, flash, send_file
+from flask_login import UserMixin, login_required, login_user, logout_user, current_user
+from flask_oauth import OAuth
+#  from flask.ext.login import login_required
 
+from urllib3 import PoolManager, response, exceptions
+import certifi
 from sqlalchemy import func, and_, or_, desc
 from .utils import number_of_weeks,  strip_numbers
 from .income import DB, Currency, Rate, Income, Interval, Transaction, \
     Account, Payforward
-from .plot import plot_weekly_plan
+#  from .plot import plot_weekly_plan
+
+__version__ = "0.3"
+
+re_currency_exchange = re.compile(r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
 
 __version__ = "0.1"
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
 
+GOOGLE_CLIENT_ID = '571919489560-p5itd3kcf1ileur7ih5bn07kc51ur21p.apps.googleusercontent.com'
+GOOGLE_CLIENT_SECRET = 'ji3-Qsfziyj6ya0IdXUd6sGT'
+REDIRECT_URI = '/oauth2callback'  # one of the Redirect URIs from Google APIs console
+
+#
 # Load default config and override config from an environment variable
 app.config.update(dict(
     DATABASE=os.path.join(app.root_path, 'e4.db'),
@@ -30,9 +45,25 @@ app.config.update(dict(
     PASSWORD='NieniarcEgHiacHeulijkikej',
     HORIZON='12m',
     PREFERRED_URL_SCHEME='https',
-    SQLALCHEMY_DATABASE_URI='sqlite:///e4.db'
+    SQLALCHEMY_DATABASE_URI='sqlite:///e4.db',
+    DEBUG=True
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
+
+oauth = OAuth()
+
+google = oauth.remote_app('google',
+    base_url='https://www.google.com/accounts/',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    request_token_url=None,
+    request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
+                        'response_type': 'code'},
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    access_token_method='POST',
+    access_token_params={'grant_type': 'authorization_code'},
+    consumer_key=GOOGLE_CLIENT_ID,
+    consumer_secret=GOOGLE_CLIENT_SECRET)
+
 
 
 def json_serial(obj):
@@ -51,48 +82,63 @@ def json_serial(obj):
 @app.route('/update_rates')
 def update_rates():
     default_currency = DB.query(Currency).filter_by(default=1).first()
-    conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
-    param = []
+    http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
     c_title = {}
-    for currency in DB.query(Currency).all():
-        param.append("{}{}=X".format(currency, default_currency))
-        c_title[currency.title] = currency.id
-    cmd = "http://download.finance.yahoo.com/d/quotes.csv?f=sl1d1t1&s={}".format(
-        ','.join(param))
-    conn.request("GET", cmd)
-
-    param = []
     objects = []
-    results = conn.getresponse().read().decode("utf-8", "strict")
+    for currency in DB.query(Currency).all():
+        if currency == default_currency: next
+        c_title[currency.title] = currency.id
+        _request = http.request(
+            'GET',
+            "https://finance.google.com/finance/converter?a=1&from={}&to={}".format(
+                currency, default_currency))
+        if _request.status == 200:
+            for l in _request.data.decode('utf-8', 'replace').split('\n'):
+                if "id=currency_converter_result" in l:
+                    m = re_currency_exchange.match(l)
+                    if m:
+                        print("{} {} {}".format(m.group('currency_a'), m.group('currency_b'), m.group('rate')))
+                        objects.append(
+                            Rate(
+                                rate_date=datetime.datetime.now(),
+                                currency_a=default_currency.id,
+                                currency_b=c_title[m.group('currency_b')],
+                                rate=m.group('rate')))
 
-    for row in csv.reader(results.split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
-        if len(row) < 1:
-            continue
+        else:
+            print("cannot get rate {}:{}".format(currency, default_currency))
 
-        objects.append(
-            Rate(
-                rate_date=datetime.datetime.strptime(
-                    "{} {}".format(
-                        row[2], row[3]),
-                    "%m/%d/%Y %I:%M%p"),
-                currency_a=default_currency.id,
-                currency_b=c_title[row[0].replace(
-                    '{}=X'.format(default_currency.title), '')],
-                rate=row[1]))
     DB.bulk_save_objects(objects)
     DB.commit()
-
     try:
         if request.method == 'GET':
             return redirect(url_for('dispatcher', api='currency', _external=True, _scheme='https'))
         return True
-    except RuntimeError:
+    except (RuntimeError, AttributeError):
         return True
 
 
 @app.route('/')
 @app.route('/incomes')
 def show_incomes():
+    access_token = session.get('access_token')
+    if access_token is None:
+        return redirect(url_for('login'))
+    access_token = access_token[0]
+    http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
+    headers = {'Authorization': 'OAuth '+access_token}
+    request = http.request('GET', 'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
+    if request.status == 401:
+        session.pop('access_token', None)
+        return redirect(url_for('login'))
+    userinfo = json.loads(request.data.decode('utf-8', 'strict'))
+    if not (userinfo['email'] in ['alex@bezpalko.mobi', 'obezpalko@gmail.com']):
+        session.pop('access_token', None)
+        return redirect(url_for('login'))
+    else:
+        session['email'] = userinfo['email']
+        session['logged_in'] = True
+
     return render_template('show_entries.html',
                            entries=list(map(lambda x: x.to_dict(), incomes_get(id=0))),
                            currencies=currency_get(id=0),
@@ -102,6 +148,9 @@ def show_incomes():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    callback=url_for('authorized', _external=True)
+    return google.authorize(callback=callback)
+
     error = None
     if request.method == 'POST':
         if request.form['username'] != app.config['USERNAME']:
@@ -115,11 +164,28 @@ def login():
     return render_template('login.html', error=error)
 
 
+@app.route(REDIRECT_URI)
+@google.authorized_handler
+def authorized(resp):
+    access_token = resp['access_token']
+    session['access_token'] = access_token, ''
+    return redirect(url_for('show_incomes'))
+
+
+@google.tokengetter
+def get_access_token():
+    return session.get('access_token')
+
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
+    session.pop('access_token', None)
+    session.pop('email', '')
     flash('You were logged out')
-    return redirect(url_for('show_entries', _external=True, _scheme='https'))
+    return redirect(url_for('show_incomes', _external=True, _scheme='https'))
+
+def version_get(**kargs):
+    return {'version': __version__}
 
 def version_get(**kargs):
     return {'version': __version__}
@@ -456,6 +522,10 @@ def plan_get(**kwargs):
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(**kwargs):
     """ main dispatcher """
+    access_token = session.get('access_token')
+    if access_token is None:
+        return '{"access": "denied"}'
+
     if 'start_date' in kwargs and isinstance(kwargs['start_date'], datetime.date):
         start_date = kwargs['start_date']
     else:

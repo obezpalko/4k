@@ -6,10 +6,21 @@ setup(
     packages=['e4'],
     include_package_data=True,
     install_requires=[
+        'chardet',
+        'requests',
         'flask',
+        'flask_login',
+        'google-api-python-client',
+        'google-auth',
+        'google-auth-oauthlib',
+        'google-auth-httplib2',
+        'flask_oauth',
+        'URLEncoder',
         'sqlalchemy',
         'matplotlib',
-        'uwsgi'
+        'uwsgi',
+        'certifi',
+        'urllib3'
     ],
     setup_requires=[
         'pytest-runner',
