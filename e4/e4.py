@@ -19,7 +19,7 @@ from flask_googlelogin import GoogleLogin
 from .utils import number_of_weeks,  strip_numbers
 from .income import DB, Currency, Rate, Income, Interval, Transaction, \
     Account, Payforward
-from .plot import plot_weekly_plan
+#  from .plot import plot_weekly_plan
 
 __version__ = "0.2"
 

@@ -10,12 +10,10 @@ except ImportError:
     from utils import next_date
 
 import decimal
-import sys
 from sqlalchemy import and_, func, create_engine, \
     Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.exc import OperationalError
 
 import sqlalchemy.types as types
 
@@ -26,12 +24,15 @@ PRECISSION = decimal.Decimal(10) ** -2
 class SqliteNumeric(types.TypeDecorator):
     impl = types.String
 
+    @staticmethod
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(types.VARCHAR(100))
 
+    @staticmethod
     def process_bind_param(self, value, dialect):
         return str(value)
 
+    @staticmethod
     def process_result_value(self, value, dialect):
         return decimal.Decimal(value)
 
@@ -262,34 +263,6 @@ class Account(Base):
     def __repr__(self):
         return "{:10s}".format(self.title)
 
-'''
-class Balance(object):
-    def __init__(self, database=None):
-        object.__init__(self)
-        self.database = database
-        self.incomes = []
-
-    def _get_currencies(self):
-        c = set()
-        for i in self.incomes:
-            c.add(i.currency)
-        return c
-
-    def _totals(self, start=datetime.now(), end=datetime.now()):
-        t = {"_{}".format(default_currency): 0}
-        s = 0
-        for c in self._get_currencies():
-            t[c] = 0
-        for i in self.incomes:
-            b = i.get_sum(start, end)
-            t[curr] += b
-            if default_currency == i.currency:
-                t["_{}".format(default_currency)] += b
-            else:
-                t["_{}".format(default_currency)] += b * \
-                    self.current_rates[i.currency]
-        return t
-'''
 
 class Transaction(Base):
     """
