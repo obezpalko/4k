@@ -29,7 +29,7 @@ function getSunday(_date) {
   var d = new Date(_date);
   var day = d.getDay(),
       diff = d.getDate() - day; // adjust when day is sunday
-  return new dateformatted(Date(d.setDate(diff)));
+  return dateformatted(new Date(d.setDate(diff)));
 }
 
 function getFirstWeek(_date) {
@@ -43,7 +43,7 @@ function addMonths(_date, _months) {
   var d = new Date(_date);
   d.setMonth(d.getMonth() + _months);
   d.setDate(d.getDate() - 1);
-  return d.formatted();
+  return dateformatted(d);
 }
 
 function getDialogButton( dialogselector, buttonname ) {
@@ -66,7 +66,7 @@ function c_update(url){
     var items = [];
     items.push("<li><span id='currency_refresh' class='ui-icon ui-icon-refresh' onClick='c_update(\"/update_rates\")'></span></li>");
     $.each( data, function( key, val ) {
-      if (val["default"] === "0") {
+      if (val["default"] == 0) {
         items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );
       }
     });

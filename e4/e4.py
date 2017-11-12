@@ -6,6 +6,7 @@ import os
 import http.client
 import json
 import csv
+import re
 import datetime
 import decimal
 from flask import Flask, request, session, redirect, url_for, \
@@ -14,14 +15,17 @@ from flask_login import UserMixin, login_required, login_user, logout_user, curr
 from flask_oauth import OAuth
 #  from flask.ext.login import login_required
 
+from urllib3 import PoolManager, response, exceptions
+import certifi
 from sqlalchemy import func, and_, or_, desc
-from flask_googlelogin import GoogleLogin
 from .utils import number_of_weeks,  strip_numbers
 from .income import DB, Currency, Rate, Income, Interval, Transaction, \
     Account, Payforward
 #  from .plot import plot_weekly_plan
 
-__version__ = "0.2"
+__version__ = "0.3"
+
+re_currency_exchange = re.compile(r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
@@ -76,42 +80,39 @@ def json_serial(obj):
 @app.route('/update_rates')
 def update_rates():
     default_currency = DB.query(Currency).filter_by(default=1).first()
-    conn = http.client.HTTPConnection('download.finance.yahoo.com', 80)
-    param = []
+    http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
     c_title = {}
-    for currency in DB.query(Currency).all():
-        param.append("{}{}=X".format(currency, default_currency))
-        c_title[currency.title] = currency.id
-    cmd = "http://download.finance.yahoo.com/d/quotes.csv?f=sl1d1t1&s={}".format(
-        ','.join(param))
-    conn.request("GET", cmd)
-
-    param = []
     objects = []
-    results = conn.getresponse().read().decode("utf-8", "strict")
+    for currency in DB.query(Currency).all():
+        if currency == default_currency: next
+        c_title[currency.title] = currency.id
+        _request = http.request(
+            'GET',
+            "https://finance.google.com/finance/converter?a=1&from={}&to={}".format(
+                currency, default_currency))
+        if _request.status == 200:
+            for l in _request.data.decode('utf-8', 'replace').split('\n'):
+                if "id=currency_converter_result" in l:
+                    m = re_currency_exchange.match(l)
+                    if m:
+                        print("{} {} {}".format(m.group('currency_a'), m.group('currency_b'), m.group('rate')))
+                        objects.append(
+                            Rate(
+                                rate_date=datetime.datetime.now(),
+                                currency_a=default_currency.id,
+                                currency_b=c_title[m.group('currency_b')],
+                                rate=m.group('rate')))
 
-    for row in csv.reader(results.split('\n'), delimiter=',', quoting=csv.QUOTE_NONNUMERIC):
-        if len(row) < 1:
-            continue
+        else:
+            print("cannot get rate {}:{}".format(currency, default_currency))
 
-        objects.append(
-            Rate(
-                rate_date=datetime.datetime.strptime(
-                    "{} {}".format(
-                        row[2], row[3]),
-                    "%m/%d/%Y %I:%M%p"),
-                currency_a=default_currency.id,
-                currency_b=c_title[row[0].replace(
-                    '{}=X'.format(default_currency.title), '')],
-                rate=row[1]))
     DB.bulk_save_objects(objects)
     DB.commit()
-
     try:
         if request.method == 'GET':
             return redirect(url_for('dispatcher', api='currency', _external=True, _scheme='https'))
         return True
-    except RuntimeError:
+    except (RuntimeError, AttributeError):
         return True
 
 
@@ -122,8 +123,6 @@ def show_incomes():
     if access_token is None:
         return redirect(url_for('login'))
     access_token = access_token[0]
-    from urllib3 import PoolManager, response, exceptions
-    import certifi
     http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
     headers = {'Authorization': 'OAuth '+access_token}
     request = http.request('GET', 'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
@@ -518,6 +517,10 @@ def plan_get(**kwargs):
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
 def dispatcher(**kwargs):
     """ main dispatcher """
+    access_token = session.get('access_token')
+    if access_token is None:
+        return '{"access": "denied"}'
+
     if 'start_date' in kwargs and isinstance(kwargs['start_date'], datetime.date):
         start_date = kwargs['start_date']
     else:

@@ -297,7 +297,6 @@ function update_row(event, to_update, clean=false){
 $( function() {
   $( ".datepicker" ).datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });
   $( "#tabs" ).tabs();
-  console.log('start');
   $('.ui-tabs-anchor').click(function(){
     load_table($(this).text()+'_table', '/api/'+$(this).text());
     //alert($(this).text());
