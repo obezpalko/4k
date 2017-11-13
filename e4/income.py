@@ -108,7 +108,8 @@ class Currency(Base):
     rate = relationship("Rate", foreign_keys=[Rate.currency_b])
 
     def get_rate(self):
-        return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(Rate.rate_date.desc()).first()
+        return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(
+            Rate.rate_date.desc()).first()
 
     def __repr__(self):
         return "{}".format(self.title)

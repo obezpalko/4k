@@ -3,29 +3,27 @@ main programm
 """
 # all the imports
 import os
-import http.client
 import json
-import csv
 import re
 import datetime
 import decimal
 from flask import Flask, request, session, redirect, url_for, \
     render_template, flash, send_file
-from flask_login import UserMixin, login_required, login_user, logout_user, current_user
+#  from flask_login import UserMixin, login_required, login_user, logout_user, current_user
 from flask_oauth import OAuth
-#  from flask.ext.login import login_required
 
-from urllib3 import PoolManager, response, exceptions
+from urllib3 import PoolManager
 import certifi
 from sqlalchemy import func, and_, or_, desc
-from .utils import number_of_weeks,  strip_numbers
+from .utils import number_of_weeks, strip_numbers
 from .income import DB, Currency, Rate, Income, Interval, Transaction, \
     Account, Payforward
 #  from .plot import plot_weekly_plan
 
 __version__ = "0.3"
 
-re_currency_exchange = re.compile(r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
+RE_C_EXCHANGE = re.compile(
+    r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
@@ -50,18 +48,18 @@ app.config.from_envvar('E4_SETTINGS', silent=True)
 
 oauth = OAuth()
 
-google = oauth.remote_app('google',
+google = oauth.remote_app(
+    'google',
     base_url='https://www.google.com/accounts/',
     authorize_url='https://accounts.google.com/o/oauth2/auth',
     request_token_url=None,
     request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
-                        'response_type': 'code'},
+                          'response_type': 'code'},
     access_token_url='https://accounts.google.com/o/oauth2/token',
     access_token_method='POST',
     access_token_params={'grant_type': 'authorization_code'},
     consumer_key=GOOGLE_CLIENT_ID,
     consumer_secret=GOOGLE_CLIENT_SECRET)
-
 
 
 def json_serial(obj):
@@ -84,24 +82,27 @@ def update_rates():
     c_title = {}
     objects = []
     for currency in DB.query(Currency).all():
-        if currency == default_currency: next
+        if currency == default_currency:
+            continue
         c_title[currency.title] = currency.id
         _request = http.request(
             'GET',
             "https://finance.google.com/finance/converter?a=1&from={}&to={}".format(
                 currency, default_currency))
         if _request.status == 200:
-            for l in _request.data.decode('utf-8', 'replace').split('\n'):
-                if "id=currency_converter_result" in l:
-                    m = re_currency_exchange.match(l)
-                    if m:
-                        print("{} {} {}".format(m.group('currency_a'), m.group('currency_b'), m.group('rate')))
+            for line in _request.data.decode('utf-8', 'replace').split('\n'):
+                if "id=currency_converter_result" in line:
+                    match = RE_C_EXCHANGE.match(line)
+                    if match:
+                        print("{} {} {}".format(match.group('currency_a'),
+                                                match.group('currency_b'),
+                                                match.group('rate')))
                         objects.append(
                             Rate(
                                 rate_date=datetime.datetime.now(),
                                 currency_a=default_currency.id,
-                                currency_b=c_title[m.group('currency_b')],
-                                rate=m.group('rate')))
+                                currency_b=c_title[match.group('currency_b')],
+                                rate=match.group('rate')))
 
         else:
             print("cannot get rate {}:{}".format(currency, default_currency))
@@ -119,17 +120,20 @@ def update_rates():
 @app.route('/')
 @app.route('/incomes')
 def show_incomes():
+    """
+    docstring here
+    """
     access_token = session.get('access_token')
     if access_token is None:
         return redirect(url_for('login'))
     access_token = access_token[0]
-    http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
+    _http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
     headers = {'Authorization': 'OAuth '+access_token}
-    request = http.request('GET', 'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
-    if request.status == 401:
+    _request = _http.request('GET', 'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
+    if _request.status == 401:
         session.pop('access_token', None)
         return redirect(url_for('login'))
-    userinfo = json.loads(request.data.decode('utf-8', 'strict'))
+    userinfo = json.loads(_request.data.decode('utf-8', 'strict'))
     if not (userinfo['email'] in ['alex@bezpalko.mobi', 'obezpalko@gmail.com']):
         session.pop('access_token', None)
         return redirect(url_for('login'))
@@ -146,20 +150,8 @@ def show_incomes():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    callback=url_for('authorized', _external=True)
+    callback = url_for('authorized', _external=True)
     return google.authorize(callback=callback)
-
-    error = None
-    if request.method == 'POST':
-        if request.form['username'] != app.config['USERNAME']:
-            error = 'Invalid username'
-        elif request.form['password'] != app.config['PASSWORD']:
-            error = 'Invalid password'
-        else:
-            session['logged_in'] = True
-            flash('You were logged in')
-            return redirect(url_for('show_incomes', _external=True, _scheme='https'))
-    return render_template('login.html', error=error)
 
 
 @app.route(REDIRECT_URI)
@@ -176,13 +168,15 @@ def get_access_token():
 
 @app.route('/logout')
 def logout():
+
     session.pop('logged_in', None)
     session.pop('access_token', None)
     session.pop('email', '')
     flash('You were logged out')
     return redirect(url_for('show_incomes', _external=True, _scheme='https'))
 
-def version_get(**kargs):
+
+def version_get():
     return {'version': __version__}
 
 
@@ -256,8 +250,7 @@ def incomes_put(**kwargs):
 def accounts_get(**kwargs):
     if kwargs['id'] == 0:
         return DB.query(Account).filter(Account.deleted == 'n').order_by(Account.title).all()
-    else:
-        return DB.query(Account).get(kwargs['id'])
+    return DB.query(Account).get(kwargs['id'])
 
 
 def accounts_delete(**kwargs):
@@ -315,9 +308,8 @@ def transactions_get(**kwargs):
         return DB.query(Transaction).order_by(
             desc(Transaction.time)).limit(100).from_self().order_by(
                 Transaction.time).all()
-    else:
-        return DB.query(Transaction).order_by(
-            desc(Transaction.time)).get(kwargs['id'])
+    return DB.query(Transaction).order_by(
+        desc(Transaction.time)).get(kwargs['id'])
 
 
 def transactions_post(**kwargs):
@@ -406,9 +398,9 @@ def balance_get(**kwargs):
              and_(or_(Transaction.income_id <= 0, Transaction.income_id == None),
                   and_(Transaction.sum < 0,
                        and_(Transaction.time >= week_begin, Transaction.time < week_end)
-                       )
-                  )
-             )).all()
+                      )
+                 )
+            )).all()
 
     for k in tmp_results:
         week_sum += k.sum * k.account.currency.get_rate().rate
@@ -497,7 +489,7 @@ def plan_get(**kwargs):
                 "currencies": currency_get(),
                 "incomes": incomes_get()
             }
-            }
+           }
 
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
@@ -528,7 +520,8 @@ def dispatcher(**kwargs):
             start_date = datetime.datetime.strptime(
                 kwargs['start_date'], '%Y-%m-%d').date()
         except (ValueError, KeyError):
-            start_date = datetime.date.today() - datetime.timedelta(datetime.date.today().isoweekday() % 7)
+            start_date = datetime.date.today() - datetime.timedelta(
+                datetime.date.today().isoweekday() % 7)
     if 'end_date' in kwargs and isinstance(kwargs['end_date'], datetime.date):
         end_date = kwargs['end_date']
     else:
@@ -546,6 +539,10 @@ def dispatcher(**kwargs):
 
 @app.route('/img/<string:plot>/<string:start_date>/<string:end_date>', methods=['GET'])
 def plot_graph(**kwargs):
+    """
+    docstring here
+        :param **kwargs:
+    """
     return send_file(
         globals()["plot_{}".format(kwargs['plot'])](**kwargs),
         'image/png')
