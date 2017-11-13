@@ -48,7 +48,7 @@ table.entries {
 <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous" /></script>
 < ! -- -->
 <script>
-//$( document ).ready(function() { c_update('/api/currency') ; get_balance() });
+//$( document ).ready(function() { updatecurrency('/api/currency') ; get_balance() });
 var balance_url;
 var d = new Date();
 balance_url = '/api/balance/0/' + getFirstWeek(d) + '/' + addMonths(getFirstWeek(d), 6 );
@@ -306,7 +306,7 @@ $( function() {
   updateoption('.account_selector', '/api/accounts',['title', 'currency']);
   updateoption('.period_selector', '/api/intervals');
   updateoption('.currency_selector', '/api/currency');
-  c_update('/api/currency');
+  updatecurrency('/api/currency');
   $('#balance input').change(function(event){
     var a = {'start_date':'', 'end_date':''};
     a[$(this).attr('name')] = $(this).val();

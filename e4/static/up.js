@@ -66,7 +66,7 @@ function c_update(url){
     var items = [];
     items.push("<li><span id='currency_refresh' class='ui-icon ui-icon-refresh' onClick='c_update(\"/update_rates\")'></span></li>");
     $.each( data, function( key, val ) {
-      if (val["default"] == 0) {
+      if (val["default"] === 0) {
         items.push( "<li title='" + val["rate_date"] + "' id='currency_" + key + "'>" + val["title"] + ":" + val["rate"] + "</li>" );
       }
     });
