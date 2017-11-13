@@ -24,15 +24,15 @@ PRECISSION = decimal.Decimal(10) ** -2
 class SqliteNumeric(types.TypeDecorator):
     impl = types.String
 
-    #  @staticmethod
+    @classmethod
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(types.VARCHAR(100))
 
-    #  @staticmethod
+    @classmethod
     def process_bind_param(self, value, dialect):
         return str(value)
 
-    #  @staticmethod
+    @classmethod
     def process_result_value(self, value, dialect):
         return decimal.Decimal(value)
 

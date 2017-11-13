@@ -2,16 +2,18 @@
 
 function updateoption(element, url, titlefields=["title"]){
   $.getJSON(url, function(data){
-    var options = [];
+    var options = "";
     var titles;
     $.each(data, function(key, val){
       if (val["show"] !== "n" ) { 
-      titles = [];
-      titlefields.forEach( function(t){ titles.push( (t==="title") ? val[t] : val[t]["title"]);});
-      options.push("<option value='"+ val["id"] + "'" + ((val["default"] === 1) ? " selected" : "") + ">" + titles.join(" ") + "</option>");
+      titles = "";
+      titlefields.forEach( function(t){
+        titles = titles + " " + ( (t==="title") ? val[t] : val[t]["title"])
+        });
+        options = options + "<option value='" + val["id"] + "'" + ((val["default"] === 1) ? " selected" : "") + ">" + titles + "</option>";
       }
     });
-    $(element).html(options.join(""));
+    $(element).html(options);
   });
 }
 
