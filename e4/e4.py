@@ -16,12 +16,12 @@ from urllib3 import PoolManager
 import certifi
 from sqlalchemy import func, and_, or_, desc
 from .utils import number_of_weeks, strip_numbers
-#  from .database import E4Database
-from .income import DB, Currency, Rate, Income, Interval, Transaction, \
-    Account, Payforward
+from .database import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
+# from .income import DB, Currency, Rate, Income, Interval, Transaction, \
+#     Account, Payforward
 #  from .plot import plot_weekly_plan
 
-__version__ = "0.3"
+__version__ = "0.4"
 
 RE_C_EXCHANGE = re.compile(
     r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')

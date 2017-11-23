@@ -8,7 +8,7 @@ function updateoption(element, url, titlefields=["title"]){
       if (val["show"] !== "n" ) { 
       titles = "";
       titlefields.forEach( function(t){
-        titles = titles + " " + ( (t==="title") ? val[t] : val[t]["title"])
+        titles = titles + " " + ( (t==="title") ? val[t] : val[t]["title"]);
         });
         options = options + "<option value='" + val["id"] + "'" + ((val["default"] === 1) ? " selected" : "") + ">" + titles + "</option>";
       }
