@@ -16,6 +16,7 @@ from urllib3 import PoolManager
 import certifi
 from sqlalchemy import func, and_, or_, desc
 from .utils import number_of_weeks, strip_numbers
+#  from .database import E4Database
 from .income import DB, Currency, Rate, Income, Interval, Transaction, \
     Account, Payforward
 #  from .plot import plot_weekly_plan

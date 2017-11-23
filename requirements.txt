@@ -1,4 +1,5 @@
 chardet
+psycopg2
 requests
 flask
 flask_login
