@@ -11,12 +11,12 @@ from flask import Flask, request, session, redirect, url_for, \
     render_template, flash, send_file
 #  from flask_login import UserMixin, login_required, login_user, logout_user, current_user
 from flask_oauth import OAuth
-
+from flask_sqlalchemy import SQLAlchemy
 from urllib3 import PoolManager
 import certifi
-from sqlalchemy import func, and_, or_, desc
+from sqlalchemy import func, and_, or_, desc, select
 from .utils import number_of_weeks, strip_numbers
-from .database import DB, Currency, Rate, Income, Interval, Transaction, Account, Payforward
+from .database import DB, DB_URL, Currency, Rate, Income, Interval, Transaction, Account, Payforward
 # from .income import DB, Currency, Rate, Income, Interval, Transaction, \
 #     Account, Payforward
 #  from .plot import plot_weekly_plan
@@ -25,6 +25,7 @@ __version__ = "0.4"
 
 RE_C_EXCHANGE = re.compile(
     r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
+
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
@@ -42,10 +43,13 @@ app.config.update(dict(
     PASSWORD='NieniarcEgHiacHeulijkikej',
     HORIZON='12m',
     PREFERRED_URL_SCHEME='https',
-    SQLALCHEMY_DATABASE_URI='sqlite:///e4.db',
+    SESSION_TYPE = 'sqlalchemy',
+    SQLALCHEMY_DATABASE_URI = DB_URL,
+    SQLALCHEMY_TRACK_MODIFICATIONS = False,
     DEBUG=True
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
+
 
 oauth = OAuth()
 
@@ -75,6 +79,13 @@ def json_serial(obj):
     raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
 
 
+
+@app.teardown_request
+def session_clear(exception=None):
+    #  Session.remove()
+    if exception:
+        DB.rollback()
+
 @app.cli.command('rates')
 @app.route('/update_rates')
 def update_rates():
@@ -85,7 +96,7 @@ def update_rates():
     for currency in DB.query(Currency).all():
         if currency == default_currency:
             continue
-        c_title[currency.title] = currency.id
+        c_title[currency.title] = currency.record_id
         _request = http.request(
             'GET',
             "https://finance.google.com/finance/converter?a=1&from={}&to={}".format(
@@ -101,8 +112,8 @@ def update_rates():
                         objects.append(
                             Rate(
                                 rate_date=datetime.datetime.now(),
-                                currency_a=default_currency.id,
-                                currency_b=c_title[match.group('currency_b')],
+                                currency_a_id=default_currency.record_id,
+                                currency_b_id=c_title[match.group('currency_b')],
                                 rate=match.group('rate')))
 
         else:
@@ -182,18 +193,31 @@ def version_get():
 
 
 def currency_get(**kwargs):
+    '''
+    get list of currency rates
+    '''
+    max_date_q = select([
+            Rate.currency_b_id.label("b_id"),
+            func.max(Rate.rate_date).label("rate_date")
+    ]).group_by( Rate.currency_b_id ).alias('max_date_q')
+    rates_query = DB.query(
+        Rate.currency_b_id, Rate, Rate.rate_date
+    ).join(
+        max_date_q,
+        and_(
+            max_date_q.c.b_id==Rate.currency_b_id,
+            max_date_q.c.rate_date==Rate.rate_date
+        )
+    )
+
     entries = []
     if 'id' in kwargs and kwargs['id']:
         try:
-            rate = DB.query(Rate.currency_b, Rate, func.max(Rate.rate_date)).filter_by(
-                currency_b=kwargs['id']).group_by(Rate.currency_b).first()
-            return rate[1].to_dict()
+            return rates_query.filter(Rate.currency_b_id==kwargs['id']).first()[1].to_dict()
         except TypeError:
-            return {}
+            return []
     else:
-        rates = DB.query(
-            Rate.currency_b, Rate, func.max(Rate.rate_date)).group_by(Rate.currency_b).all()
-        for rate in rates:
+        for rate in rates_query.all():
             entries.append(rate[1].to_dict())
     return entries
 
@@ -297,7 +321,7 @@ def accounts_put(**kwargs):
 
 
 def transactions_delete(**kwargs):
-    income = DB.query(Transaction).filter_by(id=kwargs['id']).delete()
+    income = DB.query(Transaction).filter_by(record_id=kwargs['id']).delete()
     DB.query(Payforward).filter_by(transaction_id=kwargs['id']).delete()
     DB.commit()
     return {'deleted': income}

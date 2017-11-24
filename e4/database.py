@@ -9,17 +9,18 @@ except ImportError:
     from utils import next_date
 
 import decimal
-from sqlalchemy import and_, func, create_engine, \
+from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
     Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm.util import aliased
 
 #  import sqlalchemy.types as types
 
 PRECISSION = decimal.Decimal(10) ** -2
-
+DB_URL = 'postgresql://e4:og8ozJoch\Olt6@localhost:5432/e4'
 Base = declarative_base()
-engine = create_engine('postgresql://e4:og8ozJoch\Olt6@localhost:5432/e4')
+engine = create_engine(DB_URL)
 session = sessionmaker()
 session.configure(bind=engine)
 
@@ -41,12 +42,14 @@ class Users(Base):
     '''
     __tablename__ = 'users'
     user_id = Column(Integer, primary_key=True, name='id')
-    email = Column(String, nullable=False)
-    name = Column(String, nullable=True)
+    email = Column(String, unique=True, nullable=False)
+    username = Column(String, nullable=False)
     gender = Column(String, nullable=True)
     link = Column(String, nullable=True)
     picture = Column(String, nullable=True)
 
+    def __repr__(self):
+        return '<User %r>' % self.username
 
 class Interval(Base):
     """
@@ -63,7 +66,7 @@ class Interval(Base):
 
     def to_dict(self):
         return {
-            "id": self.id,
+            "id": self.record_id,
             "title": self.title,
             "item": self.item,
             "value": self.value
@@ -75,14 +78,17 @@ class Rate(Base):
     currenciess and rates
     """
     __tablename__ = 'rates'
-    record_id = Column(Integer, primary_key=True, name='id')
+    __table_args__ = (
+                PrimaryKeyConstraint('rate_date', 'currency_a_id', 'currency_b_id', 'rate'),
+            )
+    #  record_id = Column(Integer, primary_key=True, name='id')
     rate_date = Column(DateTime)
     currency_a_id = Column(Integer, ForeignKey('currency.id'))
     currency_b_id = Column(Integer, ForeignKey('currency.id'))
     currency_a = relationship(
-        "Currency", primaryjoin='currency.c.id==rates.c.currency_a')
+        "Currency", primaryjoin='currency.c.id==rates.c.currency_a_id')
     currency_b = relationship(
-        "Currency", primaryjoin='currency.c.id==rates.c.currency_b')
+        "Currency", primaryjoin='currency.c.id==rates.c.currency_b_id')
     rate = Column(Numeric(15, 6), nullable=False)
 
     def __repr__(self):
@@ -91,11 +97,11 @@ class Rate(Base):
     def to_dict(self):
         """convert object to dict/json"""
         return {
-            "id": self.currency_b,
-            "title": self.b.title,
+            "id": self.currency_b_id,
+            "title": self.currency_b.title,
             "rate": self.rate,
             "rate_date": self.rate_date.date().isoformat(),
-            "default": self.b.default
+            "default": self.currency_b.default
         }
 
 
@@ -108,11 +114,11 @@ class Currency(Base):
     title = Column(String)
     name = Column(String)
     default = Column(Integer)
-    rate = relationship("Rate", foreign_keys=[Rate.currency_b])
+    rate = relationship("Rate", foreign_keys=[Rate.currency_b_id])
 
     def get_rate(self):
         """return current rate"""
-        return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(
+        return DB.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
             Rate.rate_date.desc()).first()
 
     def __repr__(self):
@@ -131,10 +137,10 @@ class Currency(Base):
 
 class Income(Base):
     """income and expenditure
-    
+
     all periodic and not income and expenditure
     """
-    
+
     __tablename__ = 'incomes'
     record_id = Column(Integer, primary_key=True, name='id')
     title = Column(String)
@@ -165,7 +171,7 @@ class Income(Base):
         backlog = []
 
         (last_payment,) = DB.query(func.max(Transaction.time)).filter(
-            Transaction.income_id == self.id).first()
+            Transaction.income_id == self.record_id).first()
         if last_payment is None:
             last_payment = self.start_date
         else:
@@ -212,7 +218,7 @@ class Income(Base):
         if ignore_pf:
             return list_dates
         pf_dates = DB.query(Payforward.income_date).filter(
-            and_(Payforward.income_id == self.id,
+            and_(Payforward.income_id == self.record_id,
                  and_(Payforward.income_date >= _start_date,
                       Payforward.income_date <= _end_date))).all()
         # print(pf_dates)
@@ -261,12 +267,16 @@ class Account(Base):
     def sum(self):
         # return func.sum(Transaction.sum)
         # try:
-        return decimal.Decimal(DB.query(
+        r = DB.query(
             Transaction.account_id,
             func.sum(Transaction.sum).label('total')
         ).filter(
-            Transaction.account_id == self.id
-        ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
+            Transaction.account_id == self.record_id
+        ).group_by(Transaction.account_id).first()
+        if r:
+            return r[1]
+        else:
+            return 0.0
         #except:
         #    return decimal.Decimal(0)
 
@@ -303,7 +313,7 @@ class Transaction(Base):
         }
 
     def __repr__(self):
-        return "{:6d} {} {} {} {} {}".format(self.id, self.time, self.account,
+        return "{:6d} {} {} {} {} {}".format(self.record_id, self.time, self.account,
                                              self.sum, self.transfer, self.income)
 
 
@@ -328,4 +338,23 @@ Base.metadata.create_all(engine)
 DB = session()
 
 if __name__ == '__main__':
-    print(DB)
+    rr = aliased(Rate)
+    s = select([
+            Rate.currency_b_id.label("b_id"),
+            func.max(Rate.rate_date).label("rate_date")
+    ]).group_by( Rate.currency_b_id ).alias('s')
+
+    print(
+        DB.query(
+            Rate.currency_b_id,
+            Rate.rate,
+            Rate.rate_date
+        ).join(s, and_(s.c.b_id==Rate.currency_b_id, s.c.rate_date==Rate.rate_date))
+        .all()
+    )
+    """
+        .join(
+            Rate.currency_b_id=="rr.currency_b_id"
+        )
+    )
+    """
