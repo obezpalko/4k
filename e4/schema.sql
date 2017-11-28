@@ -142,7 +142,7 @@ CREATE TABLE accounts (
 --
 
 CREATE SEQUENCE accounts_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -174,7 +174,7 @@ CREATE TABLE currency (
 --
 
 CREATE SEQUENCE currency_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -209,7 +209,7 @@ CREATE TABLE incomes (
 --
 
 CREATE SEQUENCE incomes_id_seq
-    AS integer
+ --   AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -241,7 +241,7 @@ CREATE TABLE intervals (
 --
 
 CREATE SEQUENCE intervals_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -274,7 +274,7 @@ CREATE TABLE payforwards (
 --
 
 CREATE SEQUENCE payforwards_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -307,7 +307,7 @@ CREATE TABLE rates (
 --
 
 CREATE SEQUENCE rates_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -342,7 +342,7 @@ CREATE TABLE transactions (
 --
 
 CREATE SEQUENCE transactions_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -376,7 +376,7 @@ CREATE TABLE users (
 --
 
 CREATE SEQUENCE users_id_seq
-    AS integer
+--    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE

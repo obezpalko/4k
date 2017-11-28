@@ -2,26 +2,27 @@
 main programm
 """
 
+from flask import Flask, url_for, redirect, session
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask, url_for, session, redirect
-from .oauth import google, REDIRECT_URI, get_user_info
-from sqlalchemy.orm.session import Session
+#  from sqlalchemy.orm.session import Session
 from flask_session import Session
+from .oauth import google, REDIRECT_URI, get_user_info
+from .database import DB_URL
 
 __version__ = "1.0"
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
 
-DB_URL = 'postgresql://e4:og8ozJoch\Olt6@localhost:5432/e4-dev'
+# DB_URL = 'postgresql://e4:og8ozJoch\Olt6@localhost:5432/e4-dev'
 
 # Load default config and override config from an environment variable
 app.config.update(dict(
     SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
     PREFERRED_URL_SCHEME='https',
-    SESSION_TYPE = 'sqlalchemy',
-    SQLALCHEMY_DATABASE_URI = DB_URL,
-    SQLALCHEMY_TRACK_MODIFICATIONS = False,
+    SESSION_TYPE='sqlalchemy',
+    SQLALCHEMY_DATABASE_URI=DB_URL,
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
     DEBUG=True
 ))
 
@@ -30,7 +31,7 @@ db = SQLAlchemy(app)
 sess = Session()
 sess.init_app(app)
 
-
+"""
 class Session(db.Model):
     __tablename__ = 'sessions'
 
@@ -46,7 +47,7 @@ class Session(db.Model):
 
     def __repr__(self):
         return '<Session data %s>' % self.data
-'''
+
 class User(db.Model):
     __tablename__ = 'users'
     user_id = db.Column(db.Integer, primary_key=True, name='id')
@@ -58,7 +59,7 @@ class User(db.Model):
 
     def __repr__(self):
         return '<User %r>' % self.username
-'''
+"""
 db.create_all()
 
 
@@ -101,4 +102,3 @@ def logout():
     session.pop('access_token', None)
     session.pop('email', '')
     return redirect(url_for('show_all')) #  , _external=True, _scheme='https'))
-

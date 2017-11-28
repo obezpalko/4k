@@ -18,7 +18,7 @@ from sqlalchemy.orm.util import aliased
 #  import sqlalchemy.types as types
 
 PRECISSION = decimal.Decimal(10) ** -2
-DB_URL = 'postgresql://e4:og8ozJoch\Olt6@localhost:5432/e4'
+DB_URL = "postgresql://e4:og8ozJoch\\Olt6@localhost:5432/e4"
 Base = declarative_base()
 engine = create_engine(DB_URL)
 session = sessionmaker()
@@ -79,8 +79,8 @@ class Rate(Base):
     """
     __tablename__ = 'rates'
     __table_args__ = (
-                PrimaryKeyConstraint('rate_date', 'currency_a_id', 'currency_b_id', 'rate'),
-            )
+        PrimaryKeyConstraint('rate_date', 'currency_a_id', 'currency_b_id', 'rate'),
+    )
     #  record_id = Column(Integer, primary_key=True, name='id')
     rate_date = Column(DateTime)
     currency_a_id = Column(Integer, ForeignKey('currency.id'))
@@ -275,8 +275,7 @@ class Account(Base):
         ).group_by(Transaction.account_id).first()
         if r:
             return r[1]
-        else:
-            return 0.0
+        return 0.0
         #except:
         #    return decimal.Decimal(0)
 
@@ -340,16 +339,16 @@ DB = session()
 if __name__ == '__main__':
     rr = aliased(Rate)
     s = select([
-            Rate.currency_b_id.label("b_id"),
-            func.max(Rate.rate_date).label("rate_date")
-    ]).group_by( Rate.currency_b_id ).alias('s')
+        Rate.currency_b_id.label("b_id"),
+        func.max(Rate.rate_date).label("rate_date")
+    ]).group_by(Rate.currency_b_id).alias('s')
 
     print(
         DB.query(
             Rate.currency_b_id,
             Rate.rate,
             Rate.rate_date
-        ).join(s, and_(s.c.b_id==Rate.currency_b_id, s.c.rate_date==Rate.rate_date))
+        ).join(s, and_(s.c.b_id == Rate.currency_b_id, s.c.rate_date == Rate.rate_date))
         .all()
     )
     """
