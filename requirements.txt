@@ -1,0 +1,17 @@
+chardet
+psycopg2
+requests
+flask
+flask_login
+flask_oauth
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+flask_oauth
+URLEncoder
+sqlalchemy
+matplotlib
+uwsgi
+certifi
+urllib3
