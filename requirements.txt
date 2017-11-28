@@ -15,3 +15,5 @@ matplotlib
 uwsgi
 certifi
 urllib3
+flask_sqlalchemy
+flask_session

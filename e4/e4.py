@@ -180,7 +180,6 @@ def get_access_token():
 
 @app.route('/logout')
 def logout():
-
     session.pop('logged_in', None)
     session.pop('access_token', None)
     session.pop('email', '')
