@@ -35,6 +35,21 @@ GOOGLE_CLIENT_ID = '571919489560-p5itd3kcf1ileur7ih5bn07kc51ur21p.apps.googleuse
 GOOGLE_CLIENT_SECRET = 'ji3-Qsfziyj6ya0IdXUd6sGT'
 REDIRECT_URI = '/oauth2callback'  # one of the Redirect URIs from Google APIs console
 
+oauth = OAuth()
+
+google = oauth.remote_app(
+    'google',
+    base_url='https://www.google.com/accounts/',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    request_token_url=None,
+    request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
+                          'response_type': 'code'},
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    access_token_method='POST',
+    access_token_params={'grant_type': 'authorization_code'},
+    consumer_key=GOOGLE_CLIENT_ID,
+    consumer_secret=GOOGLE_CLIENT_SECRET)
+
 #
 # Load default config and override config from an environment variable
 app.config.update(dict(
@@ -50,37 +65,6 @@ app.config.update(dict(
     DEBUG=True
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
-
-oauth = OAuth()
-
-google = oauth.remote_app('google',
-    base_url='https://www.google.com/accounts/',
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    request_token_url=None,
-    request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
-                        'response_type': 'code'},
-    access_token_url='https://accounts.google.com/o/oauth2/token',
-    access_token_method='POST',
-    access_token_params={'grant_type': 'authorization_code'},
-    consumer_key=GOOGLE_CLIENT_ID,
-    consumer_secret=GOOGLE_CLIENT_SECRET)
-
-
-
-oauth = OAuth()
-
-google = oauth.remote_app(
-    'google',
-    base_url='https://www.google.com/accounts/',
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    request_token_url=None,
-    request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
-                          'response_type': 'code'},
-    access_token_url='https://accounts.google.com/o/oauth2/token',
-    access_token_method='POST',
-    access_token_params={'grant_type': 'authorization_code'},
-    consumer_key=GOOGLE_CLIENT_ID,
-    consumer_secret=GOOGLE_CLIENT_SECRET)
 
 
 def json_serial(obj):
@@ -194,17 +178,6 @@ def authorized(resp):
 def get_access_token():
     return session.get('access_token')
 
-@app.route(REDIRECT_URI)
-@google.authorized_handler
-def authorized(resp):
-    access_token = resp['access_token']
-    session['access_token'] = access_token, ''
-    return redirect(url_for('show_incomes'))
-
-
-@google.tokengetter
-def get_access_token():
-    return session.get('access_token')
 
 @app.route('/logout')
 def logout():
@@ -312,7 +285,7 @@ def accounts_delete(**kwargs):
         income.deleted = 'y'
         income.show = 'n'
     else:
-        DB.query(Account).filter(Account.id == kwargs['id']).delete()
+        DB.query(Account).filter(Account.record_id == kwargs['id']).delete()
     DB.commit()
     return {'deleted': kwargs['id']}
 
@@ -324,7 +297,7 @@ def accounts_post(**kwargs):
     DB.add(new_account)
     DB.flush()
     if float(strip_numbers(obj['sum'])) > 0:
-        DB.add(Transaction(account_id=new_account.id,
+        DB.add(Transaction(account_id=new_account.record_id,
                            show=obj['show'],
                            comment='initial summ',
                            time=datetime.date.today(),
@@ -372,25 +345,25 @@ def transactions_post(**kwargs):
         time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
         account_id=int(obj['account.id']),
         sum=decimal.Decimal(strip_numbers(obj['sum'])),
-        transfer=int(obj['transfer']),
-        income_id=int(obj['income.id']),
+        transfer=int(obj['transfer']) if int(obj['transfer']) > 0 else None,
+        income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
         comment=obj['comment']
     )
     DB.add(i)
+    DB.flush()
     if 'new_account.id' in obj:
         transfer = Transaction(
             time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
             account_id=int(obj['new_account.id']),
             sum=decimal.Decimal(strip_numbers(obj['new_sum'])),
-            transfer=int(obj['transfer']),
-            income_id=int(obj['income.id']),
+            transfer=int(obj['transfer']) if int(obj['transfer']) > 0 else None,
+            income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
             comment=obj['comment']
         )
         DB.add(transfer)
         DB.flush()
-        i.transfer = transfer.id
-        transfer.transfer = i.id
-    DB.flush()
+        i.transfer = transfer.record_id
+        transfer.transfer = i.record_id
     DB.commit()
     # except:
     #    abort(400)
@@ -513,7 +486,7 @@ def backlogs_put(**kwargs):
                 income_id=int(obj['income.id']),
                 income_date=origin_time,
                 payment_date=operation_time,
-                transaction_id=transaction.id
+                transaction_id=transaction.record_id
             )
         )
     DB.commit()
