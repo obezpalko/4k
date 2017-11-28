@@ -10,10 +10,12 @@ except ImportError:
     from utils import next_date
 
 import decimal
+import sys
 from sqlalchemy import and_, func, create_engine, \
     Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.exc import OperationalError
 
 import sqlalchemy.types as types
 
