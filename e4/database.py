@@ -3,59 +3,62 @@
 income class
 """
 from datetime import date, timedelta
-from os.path import dirname, realpath
 try:
     from .utils import next_date
 except ImportError:
     from utils import next_date
 
 import decimal
-import sys
-from sqlalchemy import and_, func, create_engine, \
-    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey
+from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
+    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm.util import aliased
 
-import sqlalchemy.types as types
+#  import sqlalchemy.types as types
 
-Base = declarative_base()
 PRECISSION = decimal.Decimal(10) ** -2
+DB_URL = 'postgresql://e4:og8ozJoch\Olt6@localhost:5432/e4'
+Base = declarative_base()
+engine = create_engine(DB_URL)
+session = sessionmaker()
+session.configure(bind=engine)
 
+class Users(Base):
+    '''
+{
+  "id": "117702552568097857840",
+  "email": "bestia@bondagefriday.com",
+  "verified_email": true,
+  "name": "Alex Bes (bestia)",
+  "given_name": "Alex",
+  "family_name": "Bes",
+  "link": "https://plus.google.com/117702552568097857840",
+  "picture":
+    "https://lh5.googleusercontent.com/-NPyNzjEgO9Y/AAAAAAAAAAI/AAAAAAAA1AY/QBodwoLu_7k/photo.jpg",
+  "gender": "male",
+  "hd": "bondagefriday.com"
+}
+    '''
+    __tablename__ = 'users'
+    user_id = Column(Integer, primary_key=True, name='id')
+    email = Column(String, unique=True, nullable=False)
+    username = Column(String, nullable=False)
+    gender = Column(String, nullable=True)
+    link = Column(String, nullable=True)
+    picture = Column(String, nullable=True)
 
-class SqliteNumeric(types.TypeDecorator):
-    impl = types.String
-
-    @staticmethod
-    def load_dialect_impl(dialect):
-        return dialect.type_descriptor(types.VARCHAR(100))
-
-    @staticmethod
-    def process_bind_param(value, dialect):
-        return str(value)
-
-    @staticmethod
-    def process_result_value(value, dialect):
-        return decimal.Decimal(value)
-
-    def python_type(self):
-        pass
-
-    def process_literal_param(self, value, dialect):
-        pass
-
-
-Numeric = SqliteNumeric
-
+    def __repr__(self):
+        return '<User %r>' % self.username
 
 class Interval(Base):
     """
     define intervals
     """
     __tablename__ = 'intervals'
-    id = Column(Integer, primary_key=True)
+    record_id = Column(Integer, primary_key=True, name='id')
     title = Column(String, nullable=False)
-    item = Column(Enum('d', 'm'))
+    item = Column(Enum('d', 'm', name='intervals_enum'))
     value = Column(Integer, nullable=False)
 
     def __repr__(self):
@@ -63,7 +66,7 @@ class Interval(Base):
 
     def to_dict(self):
         return {
-            "id": self.id,
+            "id": self.record_id,
             "title": self.title,
             "item": self.item,
             "value": self.value
@@ -75,26 +78,30 @@ class Rate(Base):
     currenciess and rates
     """
     __tablename__ = 'rates'
-    id = Column(Integer, primary_key=True)
+    __table_args__ = (
+                PrimaryKeyConstraint('rate_date', 'currency_a_id', 'currency_b_id', 'rate'),
+            )
+    #  record_id = Column(Integer, primary_key=True, name='id')
     rate_date = Column(DateTime)
-    currency_a = Column(Integer, ForeignKey('currency.id'))
-    currency_b = Column(Integer, ForeignKey('currency.id'))
-    a = relationship(
-        "Currency", primaryjoin='currency.c.id==rates.c.currency_a')
-    b = relationship(
-        "Currency", primaryjoin='currency.c.id==rates.c.currency_b')
-    rate = Column(Numeric(12, 2), nullable=False)
+    currency_a_id = Column(Integer, ForeignKey('currency.id'))
+    currency_b_id = Column(Integer, ForeignKey('currency.id'))
+    currency_a = relationship(
+        "Currency", primaryjoin='currency.c.id==rates.c.currency_a_id')
+    currency_b = relationship(
+        "Currency", primaryjoin='currency.c.id==rates.c.currency_b_id')
+    rate = Column(Numeric(15, 6), nullable=False)
 
     def __repr__(self):
-        return "{}={:.4f}*{}".format(self.b, self.rate, self.a)
+        return "{}={:.4f}*{}".format(self.currency_b, self.rate, self.currency_a)
 
     def to_dict(self):
+        """convert object to dict/json"""
         return {
-            "id": self.currency_b,
-            "title": self.b.title,
+            "id": self.currency_b_id,
+            "title": self.currency_b.title,
             "rate": self.rate,
             "rate_date": self.rate_date.date().isoformat(),
-            "default": self.b.default
+            "default": self.currency_b.default
         }
 
 
@@ -103,22 +110,24 @@ class Currency(Base):
     currencies definitions
     """
     __tablename__ = 'currency'
-    id = Column(Integer, primary_key=True)
+    record_id = Column(Integer, primary_key=True, name='id')
     title = Column(String)
     name = Column(String)
     default = Column(Integer)
-    rate = relationship("Rate", foreign_keys=[Rate.currency_b])
+    rate = relationship("Rate", foreign_keys=[Rate.currency_b_id])
 
     def get_rate(self):
-        return DB.query(Rate).filter(Rate.currency_b == self.id).order_by(
+        """return current rate"""
+        return DB.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
             Rate.rate_date.desc()).first()
 
     def __repr__(self):
         return "{}".format(self.title)
 
     def to_dict(self):
+        """convert object to dict/json"""
         return {
-            'id': self.id,
+            'id': self.record_id,
             'title': self.title,
             'name': self.name,
             'rate': self.get_rate(),
@@ -127,25 +136,29 @@ class Currency(Base):
 
 
 class Income(Base):
+    """income and expenditure
+
+    all periodic and not income and expenditure
     """
-    """
+
     __tablename__ = 'incomes'
-    id = Column(Integer, primary_key=True)
+    record_id = Column(Integer, primary_key=True, name='id')
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
-    currency = relationship('Currency')  # , back_populates='incomes')
+    currency = relationship('Currency')
     sum = Column(Numeric(12, 2))
     start_date = Column(Date)
     end_date = Column(Date, nullable=True)
     period_id = Column(Integer, ForeignKey('intervals.id'))
-    period = relationship('Interval')  # , back_populates='incomes')
+    period = relationship('Interval')
 
     def __repr__(self):
         return "{:20s} {}".format(self.title, self.currency)
 
     def to_dict(self):
+        """convert object to dict/json"""
         return {
-            'id': self.id,
+            'id': self.record_id,
             'title': self.title,
             'currency': self.currency,
             'sum': "{:.2f}".format(self.sum),
@@ -158,7 +171,7 @@ class Income(Base):
         backlog = []
 
         (last_payment,) = DB.query(func.max(Transaction.time)).filter(
-            Transaction.income_id == self.id).first()
+            Transaction.income_id == self.record_id).first()
         if last_payment is None:
             last_payment = self.start_date
         else:
@@ -205,7 +218,7 @@ class Income(Base):
         if ignore_pf:
             return list_dates
         pf_dates = DB.query(Payforward.income_date).filter(
-            and_(Payforward.income_id == self.id,
+            and_(Payforward.income_id == self.record_id,
                  and_(Payforward.income_date >= _start_date,
                       Payforward.income_date <= _end_date))).all()
         # print(pf_dates)
@@ -232,18 +245,18 @@ class Account(Base):
     accounts
     """
     __tablename__ = 'accounts'
-    id = Column(Integer, primary_key=True)
+    record_id = Column(Integer, primary_key=True, name='id')
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')
     transactions = relationship('Transaction', cascade="all, delete-orphan")
-    deleted = Column(Enum('y', 'n'), default='n')
-    show = Column(Enum('y', 'n'), default='y')
+    deleted = Column(Enum('y', 'n', name='is_accound_deleted_enum'), default='n')
+    show = Column(Enum('y', 'n', name='is_account_shown_enum'), default='y')
 
     def to_dict(self):
-        # decimal.getcontext().prec=PRECISSION
+        """convert object to dict/json"""
         return {
-            'id': self.id,
+            'id': self.record_id,
             'title': self.title,
             'currency': self.currency,
             'sum': "{:.2f}".format(self.sum()),
@@ -254,12 +267,16 @@ class Account(Base):
     def sum(self):
         # return func.sum(Transaction.sum)
         # try:
-        return decimal.Decimal(DB.query(
+        r = DB.query(
             Transaction.account_id,
             func.sum(Transaction.sum).label('total')
         ).filter(
-            Transaction.account_id == self.id
-        ).group_by(Transaction.account_id).first()[1]).quantize(PRECISSION)
+            Transaction.account_id == self.record_id
+        ).group_by(Transaction.account_id).first()
+        if r:
+            return r[1]
+        else:
+            return 0.0
         #except:
         #    return decimal.Decimal(0)
 
@@ -271,7 +288,7 @@ class Transaction(Base):
     """
     """
     __tablename__ = 'transactions'
-    id = Column(Integer, primary_key=True)
+    record_id = Column(Integer, primary_key=True, name='id')
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")
@@ -284,8 +301,9 @@ class Transaction(Base):
 
 
     def to_dict(self):
+        """convert object to dict/json"""
         return {
-            "id": self.id,
+            "id": self.record_id,
             "time": self.time.isoformat(),
             "account": self.account,
             "sum": "{:.2f}".format(self.sum),
@@ -295,33 +313,48 @@ class Transaction(Base):
         }
 
     def __repr__(self):
-        return "{:6d} {} {} {} {} {}".format(self.id, self.time, self.account,
+        return "{:6d} {} {} {} {} {}".format(self.record_id, self.time, self.account,
                                              self.sum, self.transfer, self.income)
 
 
 class Payforward(Base):
+    """table of regular payments which was payed before described date
+
     """
-    """
+
     __tablename__ = 'payforwards'
-    id = Column(Integer, primary_key=True)
+    record_id = Column(Integer, primary_key=True, name='id')
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
-    income = relationship("Income")  # , back_populates='transactions')
+    income = relationship('Income')
     income_date = Column(Date, nullable=False)
     payment_date = Column(Date, nullable=False)
     transaction_id = Column(Integer, ForeignKey(
         'transactions.id'), nullable=False)
-    transaction = relationship("Transaction")
+    transaction = relationship('Transaction')
 
-#
-database_file = "sqlite:///{}/e4.db".format(dirname(realpath(__file__)))
-engine = create_engine(database_file)
-session = sessionmaker()
 
-session.configure(bind=engine)
+
 Base.metadata.create_all(engine)
-
 DB = session()
 
 if __name__ == '__main__':
-    print(dir(engine.url)) # .get_dialect())
-    print(engine.url.get_dialect()) # .get_dialect())
+    rr = aliased(Rate)
+    s = select([
+            Rate.currency_b_id.label("b_id"),
+            func.max(Rate.rate_date).label("rate_date")
+    ]).group_by( Rate.currency_b_id ).alias('s')
+
+    print(
+        DB.query(
+            Rate.currency_b_id,
+            Rate.rate,
+            Rate.rate_date
+        ).join(s, and_(s.c.b_id==Rate.currency_b_id, s.c.rate_date==Rate.rate_date))
+        .all()
+    )
+    """
+        .join(
+            Rate.currency_b_id=="rr.currency_b_id"
+        )
+    )
+    """
