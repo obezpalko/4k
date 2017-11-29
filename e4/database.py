@@ -1,19 +1,15 @@
 #!/usr/bin/env python
 """
-income class
+database and tables
 """
 from datetime import date, timedelta
-try:
-    from .utils import next_date
-except ImportError:
-    from utils import next_date
-
 import decimal
 from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
     Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.util import aliased
+from .utils import next_date
 
 #  import sqlalchemy.types as types
 
@@ -24,22 +20,22 @@ engine = create_engine(DB_URL)
 session = sessionmaker()
 session.configure(bind=engine)
 
+class Session(Base):
+    __tablename__ = 'sessions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String, unique=True)
+    data = db.Column(db.LargeBinary)
+    expiry = db.Column(db.DateTime)
+
+    def __init__(self, session_id, data, expiry):
+        self.session_id = session_id
+        self.data = data
+        self.expiry = expiry
+
+    def __repr__(self):
+        return '<Session data %s>' % self.data
 class Users(Base):
-    '''
-{
-  "id": "117702552568097857840",
-  "email": "bestia@bondagefriday.com",
-  "verified_email": true,
-  "name": "Alex Bes (bestia)",
-  "given_name": "Alex",
-  "family_name": "Bes",
-  "link": "https://plus.google.com/117702552568097857840",
-  "picture":
-    "https://lh5.googleusercontent.com/-NPyNzjEgO9Y/AAAAAAAAAAI/AAAAAAAA1AY/QBodwoLu_7k/photo.jpg",
-  "gender": "male",
-  "hd": "bondagefriday.com"
-}
-    '''
     __tablename__ = 'users'
     user_id = Column(Integer, primary_key=True, name='id')
     email = Column(String, unique=True, nullable=False)

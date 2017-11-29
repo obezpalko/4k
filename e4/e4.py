@@ -12,7 +12,7 @@ from flask import Flask, request, session, redirect, url_for, \
 
 #  from flask_login import UserMixin, login_required, login_user, logout_user, current_user
 from flask_oauth import OAuth
-from flask_sqlalchemy import SQLAlchemy
+# from flask_sqlalchemy import SQLAlchemy
 from urllib3 import PoolManager
 import certifi
 from sqlalchemy import func, and_, or_, desc, select
