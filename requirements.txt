@@ -17,3 +17,4 @@ certifi
 urllib3
 flask_sqlalchemy
 flask_session
+flask_sqlalchemy_session

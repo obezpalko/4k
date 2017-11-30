@@ -5,47 +5,34 @@ database and tables
 from datetime import date, timedelta
 import decimal
 from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
-    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric
-from sqlalchemy.orm import relationship, sessionmaker
+    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric, LargeBinary
+from sqlalchemy.orm import scoped_session, relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.util import aliased
 from .utils import next_date
 
 #  import sqlalchemy.types as types
 
-PRECISSION = decimal.Decimal(10) ** -2
 DB_URL = "postgresql://e4:og8ozJoch\\Olt6@localhost:5432/e4"
-Base = declarative_base()
+
 engine = create_engine(DB_URL)
-session = sessionmaker()
-session.configure(bind=engine)
+db_session = scoped_session(sessionmaker(autocommit=False,
+                                         autoflush=False,
+                                         bind=engine))
+Base = declarative_base()
+Base.query = db_session.query_property()
 
-class Session(Base):
-    __tablename__ = 'sessions'
-
-    id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String, unique=True)
-    data = db.Column(db.LargeBinary)
-    expiry = db.Column(db.DateTime)
-
-    def __init__(self, session_id, data, expiry):
-        self.session_id = session_id
-        self.data = data
-        self.expiry = expiry
-
-    def __repr__(self):
-        return '<Session data %s>' % self.data
-class Users(Base):
+class User(Base):
     __tablename__ = 'users'
     user_id = Column(Integer, primary_key=True, name='id')
     email = Column(String, unique=True, nullable=False)
-    username = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     gender = Column(String, nullable=True)
     link = Column(String, nullable=True)
     picture = Column(String, nullable=True)
-
+    
     def __repr__(self):
-        return '<User %r>' % self.username
+        return '<User %r>' % self.name
 
 class Interval(Base):
     """
@@ -330,7 +317,7 @@ class Payforward(Base):
 
 
 Base.metadata.create_all(engine)
-DB = session()
+#  DB = session()
 
 if __name__ == '__main__':
     rr = aliased(Rate)
