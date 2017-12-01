@@ -8,7 +8,7 @@ from flask import Flask, request, url_for, redirect, session, \
     render_template
 # from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy_session import flask_scoped_session
-from sqlalchemy import and_, exc
+from sqlalchemy import and_
 from .oauth import google, REDIRECT_URI, get_user_info
 from .database import DB_URL, db_session, User, \
     UserCurrencies, Currency
