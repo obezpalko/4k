@@ -3,15 +3,13 @@
 database and tables
 """
 from datetime import date, timedelta
-import decimal
 from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
-    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric, LargeBinary
+    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric, \
+    Boolean, CHAR
 from sqlalchemy.orm import scoped_session, relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.util import aliased
 from .utils import next_date
-
-#  import sqlalchemy.types as types
 
 DB_URL = "postgresql://e4:og8ozJoch\\Olt6@localhost:5432/e4"
 
@@ -30,9 +28,9 @@ class User(Base):
     gender = Column(String, nullable=True)
     link = Column(String, nullable=True)
     picture = Column(String, nullable=True)
-    
+
     def __repr__(self):
-        return '<User %r>' % self.name
+        return "{} <{}>".format(self.name, self.email)
 
 class Interval(Base):
     """
@@ -96,12 +94,13 @@ class Currency(Base):
     record_id = Column(Integer, primary_key=True, name='id')
     title = Column(String)
     name = Column(String)
-    default = Column(Integer)
+    symbol = Column(CHAR)
+    # default = Column(Integer)
     rate = relationship("Rate", foreign_keys=[Rate.currency_b_id])
 
     def get_rate(self):
         """return current rate"""
-        return DB.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
+        return db_session.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
             Rate.rate_date.desc()).first()
 
     def __repr__(self):
@@ -116,6 +115,21 @@ class Currency(Base):
             'rate': self.get_rate(),
             'default': self.default
         }
+
+
+class UserCurrencies(Base):
+    """ link users to currencies
+    """
+
+    __tablename__ = 'user_currencies'
+    __table_args__ = (
+        PrimaryKeyConstraint('user_id', 'currency_id'),
+    )
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User')
+    currency_id = Column(Integer, ForeignKey('currency.id'))
+    currency = relationship('Currency')
+    default = Column(Boolean, default=False, nullable=False)
 
 
 class Income(Base):
@@ -150,10 +164,10 @@ class Income(Base):
             'period': self.period
         }
 
-    def get_backlog(self, max_date=date.today().replace(month=(date.today().month + 1))):
+    def get_backlog(self, max_date):
         backlog = []
 
-        (last_payment,) = DB.query(func.max(Transaction.time)).filter(
+        (last_payment,) = db_session.query(func.max(Transaction.time)).filter(
             Transaction.income_id == self.record_id).first()
         if last_payment is None:
             last_payment = self.start_date
@@ -200,7 +214,7 @@ class Income(Base):
         # print(list_dates)
         if ignore_pf:
             return list_dates
-        pf_dates = DB.query(Payforward.income_date).filter(
+        pf_dates = db_session.query(Payforward.income_date).filter(
             and_(Payforward.income_id == self.record_id,
                  and_(Payforward.income_date >= _start_date,
                       Payforward.income_date <= _end_date))).all()
@@ -250,7 +264,7 @@ class Account(Base):
     def sum(self):
         # return func.sum(Transaction.sum)
         # try:
-        r = DB.query(
+        r = db_session.query(
             Transaction.account_id,
             func.sum(Transaction.sum).label('total')
         ).filter(
@@ -327,7 +341,7 @@ if __name__ == '__main__':
     ]).group_by(Rate.currency_b_id).alias('s')
 
     print(
-        DB.query(
+        db_session.query(
             Rate.currency_b_id,
             Rate.rate,
             Rate.rate_date

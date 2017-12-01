@@ -1,0 +1,67 @@
+{% extends "layout.html" %} {% if session.user %} {% block js %}
+<script>
+    function json_post(method, url, data_, obj) {
+        var result;
+        $.ajax({
+            type: method,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            dataType: 'json',
+            url: url,
+            data: JSON.stringify(data_),
+            success: function(data) {
+                result = data['result'];
+                if (result != 'Ok') {
+                    obj.prop('checked', false);
+                }
+            }
+        });
+    }
+
+    $(function() {
+        $(":input.currency_rb").change(function() {
+            var c = $(this).val();
+            console.log("change radio val:" + c);
+            var data = {};
+            data['currency_id'] = c;
+            json_post("PUT", "/currency/set/default", data, $(this));
+            $(":input.currency_cb[value*=" + c + "]").prop('checked', true)
+
+        });
+
+        $(":input.currency_cb").change(function() {
+            var m = 'DELETE';
+            var c = $(this).val();
+            console.log("change checkbox val:" + c + " " + $(this).prop('checked'));
+            if ($(this).prop('checked')) {
+                m = 'POST';
+            } else {
+                $(":input.currency_rb[value*=" + c + "]").prop('checked', false)
+            }
+            json_post(m, "/currency/" + c, {}, $(this));
+        });
+
+    })
+</script>
+{% endblock %} {% endif %} {% block body %} {% if session.user %}
+
+<table>
+    <tr>
+        <th colspan="3">currency</th>
+
+        <th>selected</th>
+        <th>default</th>
+    </tr>
+    {% for currency in currencies %}
+    <tr>
+        <td>{{ currency[0].title }}</td>
+        <td>{{ currency[0].symbol }}</td>
+        <td>{{ currency[0].name }}</td>
+        <td><input type="checkbox" class="currency_cb" value="{{ currency[0].record_id }}" {% if currency[2] %}checked{% endif %}></td>
+        <td><input type="radio" class="currency_rb" name="default_currency" value="{{ currency[0].record_id }}" {% if currency[3] %}checked{% endif %}></td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %} {% endif %} {% endblock %}
