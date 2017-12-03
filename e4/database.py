@@ -167,7 +167,7 @@ class Income(Base):
             'period': self.period
         }
 
-    def get_backlog(self, max_date=date.today().replace(month=(date.today().month + 1))):
+    def get_backlog(self, max_date):
         backlog = []
 
         (last_payment,) = DB.query(func.max(Transaction.time)).filter(
