@@ -148,6 +148,8 @@ class Income(Base):
     end_date = Column(Date, nullable=True)
     period_id = Column(Integer, ForeignKey('intervals.id'))
     period = relationship('Interval')
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User')
 
     def __repr__(self):
         return "{:20s} {}".format(self.title, self.currency)
@@ -246,9 +248,11 @@ class Account(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User')
     transactions = relationship('Transaction', cascade="all, delete-orphan")
-    deleted = Column(Enum('y', 'n', name='is_accound_deleted_enum'), default='n')
-    show = Column(Enum('y', 'n', name='is_account_shown_enum'), default='y')
+    deleted = Column(Boolean, default=False)
+    visible = Column(Boolean, default=True)
 
     def to_dict(self):
         """convert object to dict/json"""
@@ -288,6 +292,8 @@ class Transaction(Base):
     time = Column(Date, nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'))
     account = relationship("Account")
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User')
     sum = Column(Numeric(12, 2), nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation

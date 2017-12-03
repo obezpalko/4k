@@ -1,0 +1,57 @@
+{% extends "layout.html" %} {% if session.user %} {% block js %}
+<script>
+    function json_post_and_check(method, url, data_, obj) {
+        $.ajax({
+            type: method,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            dataType: 'json',
+            url: url,
+            data: JSON.stringify(data_),
+            success: function(data) {
+                if ($.parseJSON(data)['result'] != 'Ok') {
+                    obj.prop('checked', false);
+                }
+            },
+            error: function() {
+                obj.prop('checked', !obj.prop('checked'));
+            }
+        });
+    }
+
+    $(function() {
+        $(":input.account_visible").change(function() {
+            var c = $(this).val();
+            json_post_and_check(
+                'POST',
+                "/api/account/" + c, {
+                    'edit': {
+                        'visible': $(this).prop('checked')
+                    }
+                },
+                $(this)
+            );
+        });
+
+    })
+</script>
+{% endblock %} {% endif %} {% block body %} {% if session.user %}
+
+<table>
+    <tr>
+        <th>account</th>
+        <th>currency</th>
+        <th>visible</th>
+
+    </tr>
+    {% for account in accounts %}
+    <tr>
+        <td>{{ account.title }}</td>
+        <td>{{ account.currency }}</td>
+        <td><input type="checkbox" class="account_visible" value="{{ account.record_id }}" {% if account.visible %}checked{% endif %}></td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %} {% endif %} {% endblock %}

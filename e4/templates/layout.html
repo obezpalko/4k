@@ -20,7 +20,9 @@
         <div class=nav>
             <ul>
                 {% if session.user %}
-                <li> {{ user }} </li>
+                <li>
+                    <a href="{{ url_for('accounts') }}">accounts</a>
+                </li>
                 <li>
                     <a href="{{ url_for('currency') }}">currency</a>
                 </li>
@@ -36,7 +38,10 @@
         </div>
         {% if session.user %}
         <div class=sidebar>
-            balance
+            <div class=profile>
+                <a href="{{ user.link }}"><img alt="{{ user.name }}" src="{{ user.picture }}" width="64px"></a>
+            </div>
+            <div class=balance>balance</div>
         </div>
         {% endif %}
         <div class=main>
