@@ -453,9 +453,9 @@ def backlogs_delete(**kwargs):
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     t = Transaction(
         time=datetime.datetime.strptime(obj['origin_time'], '%Y-%m-%d').date(),
-        account_id=0,
+        account_id=None,
         sum=0,
-        income_id=obj['income.id'],
+        income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
         comment='cancelled')
     DB.add(t)
     DB.flush()
@@ -473,9 +473,9 @@ def backlogs_put(**kwargs):
 
     transaction = Transaction(
         time=operation_time,
-        account_id=int(obj['account.id']),
+        account_id=int(obj['account.id']) if int(obj['account.id']) > 0 else None,
         sum=strip_numbers(obj['sum']),
-        income_id=obj['income.id'],
+        income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
         comment=obj['comment'])
     DB.add(transaction)
     DB.flush()
