@@ -11,7 +11,7 @@ from flask_sqlalchemy_session import flask_scoped_session
 from sqlalchemy import and_
 from .oauth import google, REDIRECT_URI, get_user_info
 from .database import DB_URL, db_session, User, \
-    UserCurrencies, Currency
+    UserCurrencies, Currency, Account
 
 __version__ = "1.0.1"
 
@@ -27,7 +27,7 @@ APP.config.update(dict(
     SQLALCHEMY_DATABASE_URI=DB_URL,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     DEBUG=True
-))
+    ))
 
 APP.config.from_envvar('E4_SETTINGS', silent=True)
 
@@ -35,7 +35,6 @@ APP.config.from_envvar('E4_SETTINGS', silent=True)
 @APP.teardown_appcontext
 def shutdown_session(exc=None):
     """ clean database session on errors """
-    print("{}".format(exc))
     db_session.remove()
 
 
@@ -95,60 +94,107 @@ def logout():
     session.pop('user', '')
     return redirect(url_for('index')) #  , _external=True, _scheme='https'))
 
+
+@APP.route('/accounts')
+def accounts():
+    if 'user' not in session:
+        return redirect(url_for('index'))
+    return render_template(
+        "accounts.html",
+        accounts=DB.query(Account).filter(UserCurrencies.user_id == session['user'][0]).order_by(Account.title).all(),
+        user=DB.query(User).get(session['user'][0])
+    )
+
+
 @APP.route('/currency')
 def currency():
     if 'user' not in session:
         return redirect(url_for('index'))
     subq = DB.query(UserCurrencies).filter(
         UserCurrencies.user_id == session['user'][0]).subquery('userq')
-    currencies = DB.query(Currency, subq).outerjoin(subq, subq.c.currency_id == Currency.record_id).all()
+    currencies = DB.query(Currency, subq).outerjoin(
+        subq, subq.c.currency_id == Currency.record_id).order_by(Currency.name).all()
     return render_template(
         "currency.html",
-        # my_currencies=DB.query(UserCurrencies).filter_by(user_id=session['user'][0]).all(),
         currencies=currencies,
         user=DB.query(User).get(session['user'][0])
     )
 
-@APP.route('/currency/set/default', methods=['PUT'])
-def set_default_currency():
-    if 'user' not in session:
-        return '{"access": "denied"}'
-    # delete if default already exists
-    obj = json.loads(request.data.decode('utf-8', 'strict'))
-    updated = DB.query(UserCurrencies).filter(
-        and_(
-            UserCurrencies.user_id == session['user'][0],
-            UserCurrencies.currency_id != obj['currency_id'])
-        ).update({UserCurrencies.default: False}, synchronize_session=False)
-    updated = DB.query(UserCurrencies).filter(
-        and_(
-            UserCurrencies.user_id == session['user'][0],
-            UserCurrencies.currency_id == obj['currency_id'])
-        ).update({UserCurrencies.default: True}, synchronize_session=False)
-    if updated == 0:
-        temp_user = UserCurrencies(
-            user_id=session['user'][0],
-            currency_id=obj['currency_id'],
-            default=True)
-        DB.add(temp_user)
-    DB.commit()
-    return '{"result": "Ok"}'
 
-@APP.route('/currency/<int:currency_id>', methods=['POST','DELETE'])
-def update_user_currency(**kwargs):
-    if 'user' not in session:
-        return '{"access": "denied"}'
-    if str(request.method).lower() == 'delete':
-        DB.query(UserCurrencies).filter(
+def usercurrency_put(**kwargs):
+    """ update user currencies
+
+    Arguments:
+        **kwargs id -- currency id
+
+    Returns:
+        json -- result code
+    """
+
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    updated = 0
+
+    if 'default' in obj and obj['default']:
+        # clean previous default
+        updated = DB.query(UserCurrencies).filter(
             and_(
                 UserCurrencies.user_id == session['user'][0],
-                UserCurrencies.currency_id == kwargs['currency_id'])
-            ).delete(synchronize_session=False)
+                UserCurrencies.currency_id != kwargs['id'])
+            ).update({UserCurrencies.default: False}, synchronize_session='evaluate')
+        updated = DB.query(UserCurrencies).filter(
+            and_(
+                UserCurrencies.user_id == session['user'][0],
+                UserCurrencies.currency_id == kwargs['id']
+                )
+            ).update({UserCurrencies.default: True}, synchronize_session='evaluate')
+        if updated == 0:
+            # if not updated nothing - inser new record
+            DB.add(UserCurrencies(
+                user_id=session['user'][0],
+                currency_id=kwargs['id'],
+                default=True
+                ))
     else:
-        tmp_user = UserCurrencies(
+        DB.add(UserCurrencies(
             user_id=session['user'][0],
-            currency_id=kwargs['currency_id']
-        )
-        DB.add(tmp_user)
+            currency_id=kwargs['id']
+            ))
     DB.commit()
-    return '{"result": "Ok"}'
+    return json.dumps({'result': 'Ok'})
+
+def usercurrency_delete(**kwargs):
+    DB.query(UserCurrencies).filter(
+        and_(
+            UserCurrencies.user_id == session['user'][0],
+            UserCurrencies.currency_id == kwargs['id'])
+        ).delete(synchronize_session=False)
+    DB.commit()
+    return json.dumps({'result': 'Ok'})
+
+
+def account_post(**kwargs):
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    update = {}
+    print("obj: {}".format(obj))
+    if 'edit' in obj:
+        if 'visible' in obj['edit']:
+            update[Account.visible] = obj['edit']['visible']
+        DB.query(Account).filter(
+            and_(
+                Account.record_id == kwargs['id'],
+                Account.user_id == session['user'][0]
+            )).update(update, synchronize_session='evaluate')
+        DB.commit()
+        return json.dumps({'result': 'Ok'})
+
+@APP.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
+@APP.route('/api/<string:api>/<int:id>', methods=['GET', 'DELETE', 'PUT', 'POST'])
+def main_dispatcher(**kwargs):
+    """ main dispatcher """
+    if 'user' not in session:
+        return '{"access": "denied"}'
+    return json.dumps(
+        globals()["{}_{}".format(
+            kwargs['api'],
+            str(request.method).lower())](**kwargs)
+        )

@@ -1,7 +1,6 @@
 {% extends "layout.html" %} {% if session.user %} {% block js %}
 <script>
     function json_post(method, url, data_, obj) {
-        var result;
         $.ajax({
             type: method,
             headers: {
@@ -12,10 +11,13 @@
             url: url,
             data: JSON.stringify(data_),
             success: function(data) {
-                result = data['result'];
-                if (result != 'Ok') {
+                var result = $.parseJSON(data);
+                if (result["result"] != 'Ok') {
                     obj.prop('checked', false);
                 }
+            },
+            error: function() {
+                obj.prop('checked', !obj.prop('checked'));
             }
         });
     }
@@ -23,10 +25,9 @@
     $(function() {
         $(":input.currency_rb").change(function() {
             var c = $(this).val();
-            console.log("change radio val:" + c);
-            var data = {};
-            data['currency_id'] = c;
-            json_post("PUT", "/currency/set/default", data, $(this));
+            json_post("PUT", "/api/usercurrency/" + c, {
+                "default": true
+            }, $(this));
             $(":input.currency_cb[value*=" + c + "]").prop('checked', true)
 
         });
@@ -36,11 +37,11 @@
             var c = $(this).val();
             console.log("change checkbox val:" + c + " " + $(this).prop('checked'));
             if ($(this).prop('checked')) {
-                m = 'POST';
+                m = 'PUT';
             } else {
                 $(":input.currency_rb[value*=" + c + "]").prop('checked', false)
             }
-            json_post(m, "/currency/" + c, {}, $(this));
+            json_post(m, "/api/usercurrency/" + c, {}, $(this));
         });
 
     })
