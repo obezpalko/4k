@@ -297,7 +297,7 @@ def accounts_post(**kwargs):
     DB.add(new_account)
     DB.flush()
     if float(strip_numbers(obj['sum'])) > 0:
-        DB.add(Transaction(account_id=new_account.record_id,
+        DB.add(Transaction(account_id=new_account.id,
                            show=obj['show'],
                            comment='initial summ',
                            time=datetime.date.today(),
@@ -343,7 +343,7 @@ def transactions_post(**kwargs):
     # try:
     i = Transaction(
         time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
-        account_id=int(obj['account.id']),
+        account_id=int(obj['account.id']) if int(obj['account.id']) > 0 else None,
         sum=decimal.Decimal(strip_numbers(obj['sum'])),
         transfer=int(obj['transfer']) if int(obj['transfer']) > 0 else None,
         income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
@@ -354,7 +354,7 @@ def transactions_post(**kwargs):
     if 'new_account.id' in obj:
         transfer = Transaction(
             time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
-            account_id=int(obj['new_account.id']),
+            account_id=int(obj['new_account.id']) if int(obj['new_account.id']) > 0 else None,
             sum=decimal.Decimal(strip_numbers(obj['new_sum'])),
             transfer=int(obj['transfer']) if int(obj['transfer']) > 0 else None,
             income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
