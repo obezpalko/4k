@@ -15,8 +15,9 @@
 
 <body>
     <div class=page>
-        <h1>E4</h1>
-        <div class=header>header</div>
+        <div class=header>
+            <h1>E4</h1>
+        </div>
         <div class=nav>
             <ul>
                 {% if session.user %}
@@ -36,14 +37,16 @@
                 {% endif %}
             </ul>
         </div>
-        {% if session.user %}
+
         <div class=sidebar>
+            {% if session.user %}
             <div class=profile>
                 <a href="{{ user.link }}"><img alt="{{ user.name }}" src="{{ user.picture }}" width="64px"></a>
             </div>
             <div class=balance>balance</div>
+            {% endif %}
         </div>
-        {% endif %}
+
         <div class=main>
             {% block body %}{% endblock %}
         </div>

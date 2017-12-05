@@ -31,16 +31,24 @@ h2 {
     background: #99c;
     margin: 0 auto;
     width: 95%;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: 50px 50px 100% 50px;
+    grid-gap: 5px;
 }
 
 .header {
     background: #ddd;
     padding: 5px 10px;
+    grid-column: 1 / 13;
+    grid-row: 1 / 2;
 }
 
 .nav {
     padding: 5px 10px;
     background: #c99;
+    grid-column: 1 / 10;
+    grid-row: 2 / 3;
 }
 
 .nav ul {
@@ -50,9 +58,9 @@ h2 {
 }
 
 .nav li {
-    display: inline;
     margin: 0;
     padding: 0;
+    display: inline;
 }
 
 .hidden {
@@ -60,24 +68,24 @@ h2 {
 }
 
 .sidebar {
-    float: right;
-    min-width: 250px;
-    min-height: 300px;
     padding: 10px;
     background: #c9c;
+    grid-column: 10 / 13;
+    grid-row: 2 / 4;
 }
 
 .main {
-    min-width: 480px;
-    float: left;
     padding: 10px;
     background: #9c9;
+    grid-row: 3 / 4;
+    grid-column: 1 / 10;
 }
 
 .footer {
     background: #cc9;
     padding: 5px 10px;
-    clear: both;
+    grid-row: 4;
+    grid-column: 1 / 13;
 }
 
 .footer p {
