@@ -2,7 +2,7 @@
  useful functions to work with objects
 """
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from calendar import monthrange
 from math import ceil
 # from .database import Currency, Income, Rate, Interval, Transaction, Account
@@ -53,5 +53,5 @@ def number_of_weeks(date1, date2):
 
 
 def strip_numbers(number):
+    ''' replace accidentally entered instead decimal dot chars'''
     return number.replace('ю', '.').replace('ץ', '.').replace(',', '.').replace(' ', '')
-

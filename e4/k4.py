@@ -8,7 +8,7 @@ from flask import Flask, request, url_for, redirect, session, \
     render_template, Response
 # from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy_session import flask_scoped_session
-from sqlalchemy import func, and_, or_, desc, select
+from sqlalchemy import func, and_, select
 from .oauth import google, REDIRECT_URI, get_user_info
 from .database import DB_URL, db_session, User, \
     UserCurrencies, Currency, Account, Rate, json_serial
@@ -36,6 +36,8 @@ APP.config.from_envvar('E4_SETTINGS', silent=True)
 @APP.teardown_appcontext
 def shutdown_session(exc=None):
     """ clean database session on errors """
+    if exc is None:
+        pass
     db_session.remove()
 
 
@@ -98,17 +100,20 @@ def logout():
 
 @APP.route('/accounts')
 def accounts():
+    """ show account page """
     if 'user' not in session:
         return redirect(url_for('index'))
     return render_template(
         "accounts.html",
-        accounts=DB.query(Account).filter(UserCurrencies.user_id == session['user'][0]).order_by(Account.title).all(),
+        accounts=DB.query(Account).filter(
+            UserCurrencies.user_id == session['user'][0]).order_by(Account.title).all(),
         user=DB.query(User).get(session['user'][0])
     )
 
 
 @APP.route('/currency')
 def currency():
+    ''' show currency page '''
     if 'user' not in session:
         return redirect(url_for('index'))
     subq = DB.query(UserCurrencies).filter(
@@ -126,16 +131,16 @@ def currency_get(**kwargs):
     get list of currency rates
     '''
     max_date_q = select([
-            Rate.currency_b_id.label("b_id"),
-            func.max(Rate.rate_date).label("rate_date")
-    ]).group_by( Rate.currency_b_id ).alias('max_date_q')
+        Rate.currency_b_id.label("b_id"),
+        func.max(Rate.rate_date).label("rate_date")]).group_by(
+            Rate.currency_b_id).alias('max_date_q')
     rates_query = DB.query(
         Rate.currency_b_id, Rate, Rate.rate_date
     ).join(
         max_date_q,
         and_(
-            max_date_q.c.b_id==Rate.currency_b_id,
-            max_date_q.c.rate_date==Rate.rate_date
+            max_date_q.c.b_id == Rate.currency_b_id,
+            max_date_q.c.rate_date == Rate.rate_date
         )
     )
 
@@ -193,6 +198,7 @@ def usercurrency_put(**kwargs):
     return {'result': 'Ok'}
 
 def usercurrency_delete(**kwargs):
+    ''' delete user currency '''
     DB.query(UserCurrencies).filter(
         and_(
             UserCurrencies.user_id == session['user'][0],
@@ -203,6 +209,7 @@ def usercurrency_delete(**kwargs):
 
 
 def account_post(**kwargs):
+    ''' update account '''
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     update = {}
     print("obj: {}".format(obj))
@@ -218,14 +225,22 @@ def account_post(**kwargs):
         return {'result': 'Ok'}
 
 def account_get(**kwargs):
+    ''' account api '''
     if kwargs['id'] == 0:
-        return {"id": 0, "title": "", "currency": {"id": 1}, "sum": 0.00, "visible": True, "deleted": False}
+        return {
+            "id": 0,
+            "title": "",
+            "currency": {"id": 1},
+            "sum": 0.00,
+            "visible": True,
+            "deleted": False
+        }
     return DB.query(Account).filter(
         and_(
             Account.record_id == kwargs['id'],
             Account.user_id == session['user'][0]
         )).first()
-    
+
 
 @APP.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
 @APP.route('/api/<string:api>/<int:id>', methods=['GET', 'DELETE', 'PUT', 'POST'])
@@ -234,11 +249,12 @@ def main_dispatcher(**kwargs):
     if 'user' not in session:
         return '{"access": "denied"}'
 
-    return Response(response=json.dumps(
-                        globals()["{}_{}".format(
-                            kwargs['api'],
-                            str(request.method).lower())](**kwargs),
-                        default=json_serial
-                        ),
-                    status=200,
-                    mimetype="application/json")
+    return Response(
+        response=json.dumps(
+            globals()["{}_{}".format(
+                kwargs['api'],
+                str(request.method).lower())](**kwargs),
+            default=json_serial
+            ),
+        status=200,
+        mimetype="application/json")
