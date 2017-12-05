@@ -5,13 +5,14 @@ main programm
 import json
 # from datetime import datetime, timedelta
 from flask import Flask, request, url_for, redirect, session, \
-    render_template
+    render_template, Response
 # from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy_session import flask_scoped_session
-from sqlalchemy import and_
+from sqlalchemy import func, and_, or_, desc, select
 from .oauth import google, REDIRECT_URI, get_user_info
 from .database import DB_URL, db_session, User, \
-    UserCurrencies, Currency, Account
+    UserCurrencies, Currency, Account, Rate, json_serial
+
 
 __version__ = "1.0.1"
 
@@ -73,9 +74,9 @@ def check_user(userinfo):
         user = User(
             email=userinfo['email'],
             name=userinfo['name'],
-            gender=userinfo['gender'],
-            link=userinfo['link'],
-            picture=userinfo['picture']
+            gender=userinfo['gender'] if 'gender' in userinfo else None,
+            link=userinfo['link'] if 'link' in userinfo else None,
+            picture=userinfo['picture'] if 'picture' in userinfo else None
         )
         DB.add(user)
         DB.commit()
@@ -120,6 +121,35 @@ def currency():
         user=DB.query(User).get(session['user'][0])
     )
 
+def currency_get(**kwargs):
+    '''
+    get list of currency rates
+    '''
+    max_date_q = select([
+            Rate.currency_b_id.label("b_id"),
+            func.max(Rate.rate_date).label("rate_date")
+    ]).group_by( Rate.currency_b_id ).alias('max_date_q')
+    rates_query = DB.query(
+        Rate.currency_b_id, Rate, Rate.rate_date
+    ).join(
+        max_date_q,
+        and_(
+            max_date_q.c.b_id==Rate.currency_b_id,
+            max_date_q.c.rate_date==Rate.rate_date
+        )
+    )
+
+    entries = []
+    if 'id' in kwargs and kwargs['id']:
+        try:
+            return rates_query.filter(Rate.currency_b_id == kwargs['id']).first()[1].to_dict()
+        except TypeError:
+            return []
+    else:
+        for rate in rates_query.all():
+            entries.append(rate[1].to_dict())
+    return entries
+
 
 def usercurrency_put(**kwargs):
     """ update user currencies
@@ -160,7 +190,7 @@ def usercurrency_put(**kwargs):
             currency_id=kwargs['id']
             ))
     DB.commit()
-    return json.dumps({'result': 'Ok'})
+    return {'result': 'Ok'}
 
 def usercurrency_delete(**kwargs):
     DB.query(UserCurrencies).filter(
@@ -169,7 +199,7 @@ def usercurrency_delete(**kwargs):
             UserCurrencies.currency_id == kwargs['id'])
         ).delete(synchronize_session=False)
     DB.commit()
-    return json.dumps({'result': 'Ok'})
+    return {'result': 'Ok'}
 
 
 def account_post(**kwargs):
@@ -185,7 +215,17 @@ def account_post(**kwargs):
                 Account.user_id == session['user'][0]
             )).update(update, synchronize_session='evaluate')
         DB.commit()
-        return json.dumps({'result': 'Ok'})
+        return {'result': 'Ok'}
+
+def account_get(**kwargs):
+    if kwargs['id'] == 0:
+        return {"id": 0, "title": "", "currency": {"id": 1}, "sum": 0.00, "visible": True, "deleted": False}
+    return DB.query(Account).filter(
+        and_(
+            Account.record_id == kwargs['id'],
+            Account.user_id == session['user'][0]
+        )).first()
+    
 
 @APP.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
 @APP.route('/api/<string:api>/<int:id>', methods=['GET', 'DELETE', 'PUT', 'POST'])
@@ -193,8 +233,12 @@ def main_dispatcher(**kwargs):
     """ main dispatcher """
     if 'user' not in session:
         return '{"access": "denied"}'
-    return json.dumps(
-        globals()["{}_{}".format(
-            kwargs['api'],
-            str(request.method).lower())](**kwargs)
-        )
+
+    return Response(response=json.dumps(
+                        globals()["{}_{}".format(
+                            kwargs['api'],
+                            str(request.method).lower())](**kwargs),
+                        default=json_serial
+                        ),
+                    status=200,
+                    mimetype="application/json")

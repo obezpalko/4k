@@ -2,9 +2,10 @@
  useful functions to work with objects
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from calendar import monthrange
 from math import ceil
+# from .database import Currency, Income, Rate, Interval, Transaction, Account
 
 
 def dict_factory(cursor, row):
@@ -54,13 +55,3 @@ def number_of_weeks(date1, date2):
 def strip_numbers(number):
     return number.replace('ю', '.').replace('ץ', '.').replace(',', '.').replace(' ', '')
 
-# def json_serial(obj):
-#     """JSON serializer for objects not serializable by default json code"""
-
-#     if isinstance(obj, (datetime.datetime, datetime.date)):
-#         return obj.isoformat()
-#     if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
-#         return obj.to_dict()
-#     if isinstance(obj, decimal.Decimal):
-#         return format(obj.__str__())
-#     raise TypeError("Type {} not serializable ({})".format(type(obj), obj))

@@ -2,7 +2,8 @@
 """
 database and tables
 """
-from datetime import date, timedelta
+from datetime import datetime, timedelta, date
+import decimal
 from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
     Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric, \
     Boolean, CHAR
@@ -19,6 +20,17 @@ db_session = scoped_session(sessionmaker(autocommit=False,
                                          bind=engine))
 Base = declarative_base()
 Base.query = db_session.query_property()
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
+        return obj.to_dict()
+    if isinstance(obj, decimal.Decimal):
+        return format(obj.__str__())
+    raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
 
 class User(Base):
     __tablename__ = 'users'
@@ -70,7 +82,7 @@ class Rate(Base):
         "Currency", primaryjoin='currency.c.id==rates.c.currency_a_id')
     currency_b = relationship(
         "Currency", primaryjoin='currency.c.id==rates.c.currency_b_id')
-    rate = Column(Numeric(15, 6), nullable=False)
+    rate = Column(Numeric(15, 4), nullable=False)
 
     def __repr__(self):
         return "{}={:.4f}*{}".format(self.currency_b, self.rate, self.currency_a)
@@ -80,9 +92,9 @@ class Rate(Base):
         return {
             "id": self.currency_b_id,
             "title": self.currency_b.title,
+            "symbol": self.currency_b.symbol,
             "rate": self.rate,
-            "rate_date": self.rate_date.date().isoformat(),
-            "default": self.currency_b.default
+            "rate_date": self.rate_date.date().isoformat()
         }
 
 
@@ -95,7 +107,6 @@ class Currency(Base):
     title = Column(String)
     name = Column(String)
     symbol = Column(CHAR)
-    # default = Column(Integer)
     rate = relationship("Rate", foreign_keys=[Rate.currency_b_id])
 
     def get_rate(self):
@@ -112,9 +123,8 @@ class Currency(Base):
             'id': self.record_id,
             'title': self.title,
             'name': self.name,
-            'rate': self.get_rate(),
-            'default': self.default
-        }
+            'rate': self.get_rate()
+            }
 
 
 class UserCurrencies(Base):
@@ -261,13 +271,11 @@ class Account(Base):
             'title': self.title,
             'currency': self.currency,
             'sum': "{:.2f}".format(self.sum()),
-            'show': self.show,
+            'visible': self.visible,
             'deleted': self.deleted
         }
 
     def sum(self):
-        # return func.sum(Transaction.sum)
-        # try:
         r = db_session.query(
             Transaction.account_id,
             func.sum(Transaction.sum).label('total')
@@ -277,8 +285,7 @@ class Account(Base):
         if r:
             return r[1]
         return 0.0
-        #except:
-        #    return decimal.Decimal(0)
+
 
     def __repr__(self):
         return "{:10s}".format(self.title)

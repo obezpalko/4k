@@ -21,6 +21,21 @@
         });
     }
 
+    function load_currencies(url) {
+        r = ''
+        $.ajax({
+            dataType: "json",
+            url: url,
+            success: function(data) {
+                $.each(data, function(key, val) {
+                    r += '<option value="' + val['id'] + '">' + val['symbol'] + ' ' + val['title'] +
+                        '</option>\n';
+                });
+                $("select[name='currency.id']").html(r);
+            }
+        });
+    }
+
     $(function() {
         $(":input.account_visible").change(function() {
             var c = $(this).val();
@@ -34,22 +49,75 @@
                 $(this)
             );
         });
+        $('.account_edit').click(function() {
+            var accountid = $(this).attr('href').substring(1);
+            var buttons = [];
+            if (accountid === '0') {
+                // new account
+                buttons = [{
+                    text: 'Insert'
+                }]
+            } else {
+                // modify account
 
+                buttons = [{
+                    text: 'Change'
+                }, {
+                    text: 'Delete'
+                }]
+            }
+            $.ajax({
+                dataType: 'json',
+                url: '/api/account/' + accountid,
+                success: function(data) {
+                    $("#accounts [name='id']").val(data['id']);
+                    $("#accounts [name='title']").val(data['title']);
+                    $("#accounts [name='currency.id']").val(data['currency']['id']);
+                    $("#accounts [name='visible']").prop('checked', data['visible']);
+
+                    $("#accounts [name='sum']").val(data['sum']);
+                    $('#accounts').dialog({
+                        buttons: buttons
+                    }).focus();
+                }
+            });
+
+
+        });
+        load_currencies('/api/currency');
     })
 </script>
 {% endblock %} {% endif %} {% block body %} {% if session.user %}
 
+<form action="{{ url_for('main_dispatcher', api='account') }}" method=post class="add-entry hidden" id="accounts">
+    <dl>
+        <dt>ID</dt>
+        <dd><input type=text name=id class=id value="" size=4 disabled></dd>
+        <dt>Title</dt>
+        <dd><input type=text size=25 name=title class=form_save value=""></dd>
+        <dt>Currency</dt>
+        <dd><select name=currency.id class="currency currency_selector form_save"></select></dd>
+        <dt>Visible</dt>
+        <dd><input type="checkbox" name=visible class=form_save>
+        </dd>
+        <dt>Summ</dt>
+        <dd><input name=sum class=form_save size=10></dd>
+    </dl>
+</form>
+
 <table>
     <tr>
-        <th>account</th>
-        <th>currency</th>
+        <th>account <a href='#0' class="account_edit">+</a></th>
+        <th>&nbsp;</th>
         <th>visible</th>
 
     </tr>
     {% for account in accounts %}
     <tr>
-        <td>{{ account.title }}</td>
-        <td>{{ account.currency }}</td>
+        <td>
+            <a href='#{{ account.record_id }}' class="account_edit">{{ account.title }}</a>
+        </td>
+        <td><span class="currency_id hidden">{{ account.currency_id }}</span>{{ account.currency.symbol }}</td>
         <td><input type="checkbox" class="account_visible" value="{{ account.record_id }}" {% if account.visible %}checked{% endif %}></td>
     </tr>
     {% endfor %}
