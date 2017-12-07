@@ -3,7 +3,7 @@
 database and tables
 """
 from datetime import datetime, timedelta, date
-import decimal
+from decimal import Decimal
 from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
     Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric, \
     Boolean, CHAR
@@ -28,7 +28,7 @@ def json_serial(obj):
         return obj.isoformat()
     if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
         return obj.to_dict()
-    if isinstance(obj, decimal.Decimal):
+    if isinstance(obj, Decimal):
         return format(obj.__str__())
     raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
 
@@ -284,7 +284,7 @@ class Account(Base):
         ).group_by(Transaction.account_id).first()
         if r:
             return r[1]
-        return 0.0
+        return Decimal(0.0)
 
 
     def __repr__(self):

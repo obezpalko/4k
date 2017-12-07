@@ -1,6 +1,6 @@
 {% extends "layout.html" %} {% if session.user %} {% block js %}
 <script>
-    function json_post_and_check(method, url, data_, obj) {
+    function json_api_call(method, url, data, func_success, func_error) {
         $.ajax({
             type: method,
             headers: {
@@ -9,15 +9,10 @@
             },
             dataType: 'json',
             url: url,
-            data: JSON.stringify(data_),
-            success: function(data) {
-                if ($.parseJSON(data)['result'] != 'Ok') {
-                    obj.prop('checked', false);
-                }
-            },
-            error: function() {
-                obj.prop('checked', !obj.prop('checked'));
-            }
+            data: JSON.stringify(data),
+            success: func_success,
+            error: func_error
+
         });
     }
 
@@ -39,14 +34,21 @@
     $(function() {
         $(":input.account_visible").change(function() {
             var c = $(this).val();
-            json_post_and_check(
+            json_api_call(
                 'POST',
                 "/api/account/" + c, {
-                    'edit': {
-                        'visible': $(this).prop('checked')
+                    'visible': $(this).prop('checked')
+                },
+                function(data) {
+                    console.log('data +' + JSON.stringify(data));
+                    if (data['result'] != 'Ok') {
+                        $(this).prop('checked', false);
                     }
                 },
-                $(this)
+                function() {
+                    $(this).prop('checked', !$(this).prop('checked'));
+                }
+
             );
         });
         $('.account_edit').click(function() {
@@ -55,21 +57,76 @@
             if (accountid === '0') {
                 // new account
                 buttons = [{
-                    text: 'Insert'
+                    text: 'Insert',
+                    click: function() {
+                        var data = {
+                            title: $("#accounts [name='title']").val(),
+                            currency: $("#accounts [name='currency.id']").val(),
+                            visible: $("#accounts [name='visible']").prop('checked'),
+                            sum: $("#accounts [name='sum']").val()
+                        };
+                        //console.log('insert' + JSON.stringify(data));
+                        json_api_call('PUT', '/api/account', data,
+                            function(data) {
+                                location.reload();
+                                $('#accounts').dialog("close");
+                                return false;
+                            },
+                            function(data) {
+                                alert('error on \n' + JSON.stringify(data));
+                                $('#accounts').dialog("close");
+                                return false;
+                            }
+                        )
+                    }
                 }]
             } else {
                 // modify account
 
                 buttons = [{
-                    text: 'Change'
+                    text: 'Change',
+                    click: function() {
+                        json_api_call('POST', '/api/account/' + accountid, {
+                                title: $("#accounts [name='title']").val(),
+                                currency: $("#accounts [name='currency.id']").val(),
+                                visible: $("#accounts [name='visible']").prop('checked'),
+                                sum: $("#accounts [name='sum']").val()
+                            },
+                            function(data) {
+                                location.reload();
+                                $('#accounts').dialog("close");
+                                return false;
+                            },
+                            function() {
+                                alert('error on \n' + JSON.stringify(data));
+                                $('#accounts').dialog("close");
+                                return false;
+                            }
+                        )
+
+                    }
                 }, {
-                    text: 'Delete'
+                    text: 'Delete',
+                    click: function() {
+                        json_api_call('DELETE', '/api/account/' + accountid, {
+                                delete: accountid
+                            },
+                            function(data) {
+                                location.reload();
+                                $('#accounts').dialog("close");
+                                return false;
+                            },
+                            function() {
+                                alert('error on \n' + JSON.stringify(data));
+                                $('#accounts').dialog("close");
+                                return false;
+                            }
+                        )
+                    }
                 }]
             }
-            $.ajax({
-                dataType: 'json',
-                url: '/api/account/' + accountid,
-                success: function(data) {
+            json_api_call('GET', '/api/account/' + accountid, '',
+                function(data) {
                     $("#accounts [name='id']").val(data['id']);
                     $("#accounts [name='title']").val(data['title']);
                     $("#accounts [name='currency.id']").val(data['currency']['id']);
@@ -79,8 +136,10 @@
                     $('#accounts').dialog({
                         buttons: buttons
                     }).focus();
-                }
-            });
+                },
+                function() {}
+            );
+
 
 
         });

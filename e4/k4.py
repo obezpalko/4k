@@ -3,7 +3,8 @@ main programm
 """
 
 import json
-# from datetime import datetime, timedelta
+from decimal import Decimal
+from datetime import date
 from flask import Flask, request, url_for, redirect, session, \
     render_template, Response
 # from flask_sqlalchemy import SQLAlchemy
@@ -11,8 +12,8 @@ from flask_sqlalchemy_session import flask_scoped_session
 from sqlalchemy import func, and_, select
 from .oauth import google, REDIRECT_URI, get_user_info
 from .database import DB_URL, db_session, User, \
-    UserCurrencies, Currency, Account, Rate, json_serial
-
+    UserCurrencies, Currency, Account, Rate, Transaction, json_serial
+from .utils import strip_numbers
 
 __version__ = "1.0.1"
 
@@ -106,7 +107,11 @@ def accounts():
     return render_template(
         "accounts.html",
         accounts=DB.query(Account).filter(
-            UserCurrencies.user_id == session['user'][0]).order_by(Account.title).all(),
+            and_(
+                Account.user_id == session['user'][0],
+                Account.deleted != True
+            )
+            ).order_by(Account.title, Account.currency_id).all(),
         user=DB.query(User).get(session['user'][0])
     )
 
@@ -211,18 +216,41 @@ def usercurrency_delete(**kwargs):
 def account_post(**kwargs):
     ''' update account '''
     obj = json.loads(request.data.decode('utf-8', 'strict'))
-    update = {}
-    print("obj: {}".format(obj))
-    if 'edit' in obj:
-        if 'visible' in obj['edit']:
-            update[Account.visible] = obj['edit']['visible']
-        DB.query(Account).filter(
-            and_(
-                Account.record_id == kwargs['id'],
-                Account.user_id == session['user'][0]
-            )).update(update, synchronize_session='evaluate')
-        DB.commit()
-        return {'result': 'Ok'}
+    account = account = DB.query(Account).get(kwargs['id'])
+    if 'visible' in obj:
+        account.visible = obj['visible']
+    if 'title' in obj:
+        account.title = obj['title']
+    if 'currency' in obj:
+        account.currency_id = obj['currency']
+    if 'sum' in obj:
+        delta_sum = Decimal(strip_numbers(obj['sum'])) - account.sum()
+        if delta_sum != 0:
+            print('sum update required')
+            transaction = Transaction(
+                time=date.today(), sum=delta_sum,
+                account_id=kwargs['id'], user_id=session['user'][0],
+                comment='fix account summ')
+            DB.add(transaction)
+    DB.commit()
+    return {'result': 'Ok'}
+
+
+def account_put(**kwargs):
+    ''' update account '''
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    new_account = Account(
+        title=obj['title'],
+        currency_id=obj['currency'],
+        user_id=session['user'][0],
+        visible=obj['visible']
+    )
+    DB.add(new_account)
+    print("kwargs: {}".format(kwargs))
+    DB.commit()
+
+    return {'result': 'Ok', 'id': new_account.record_id}
+
 
 def account_get(**kwargs):
     ''' account api '''
@@ -241,8 +269,19 @@ def account_get(**kwargs):
             Account.user_id == session['user'][0]
         )).first()
 
+def account_delete(**kwargs):
+    ''' mark account as deleted if there are transactions '''
+    account = DB.query(Account).get(kwargs['id'])
+    if DB.query(Transaction).filter(Transaction.account_id == kwargs['id']).count() > 0:
+        account.deleted = True
+        account.show = False
+    else:
+        DB.query(Account).filter(Account.record_id == kwargs['id']).delete()
+    DB.commit()
+    return {'deleted': kwargs['id']}
 
-@APP.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
+
+@APP.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST', 'PUT'])
 @APP.route('/api/<string:api>/<int:id>', methods=['GET', 'DELETE', 'PUT', 'POST'])
 def main_dispatcher(**kwargs):
     """ main dispatcher """
