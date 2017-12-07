@@ -1,38 +1,47 @@
 #!/usr/bin/env python
+
 """
 database and tables
 """
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-from sqlalchemy import and_, func, create_engine, select, PrimaryKeyConstraint, \
-    Column, DateTime, Date, String, Integer, Enum, Text, ForeignKey, Numeric, \
-    Boolean, CHAR
+from sqlalchemy import and_, func, create_engine, select, \
+    PrimaryKeyConstraint, Column, DateTime, Date, String, Integer, Enum, \
+    Text, ForeignKey, Numeric, Boolean, CHAR
 from sqlalchemy.orm import scoped_session, relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm.util import aliased
 from .utils import next_date
 
 DB_URL = "postgresql://e4:og8ozJoch\\Olt6@localhost:5432/e4"
 
-engine = create_engine(DB_URL)
-db_session = scoped_session(sessionmaker(autocommit=False,
+
+__engine__ = create_engine(DB_URL)
+DB_SESSION = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
-                                         bind=engine))
-Base = declarative_base()
-Base.query = db_session.query_property()
+                                         bind=__engine__))
+__base__ = declarative_base()
+__base__.query = DB_SESSION.query_property()
+
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
 
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
-    if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
+    if isinstance(obj,
+                  (Currency, Income, Rate, Interval, Transaction, Account)):
         return obj.to_dict()
     if isinstance(obj, Decimal):
         return format(obj.__str__())
     raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
 
-class User(Base):
+
+class User(__base__):
+    """ user table.
+
+    processing users
+    """
+
     __tablename__ = 'users'
     user_id = Column(Integer, primary_key=True, name='id')
     email = Column(String, unique=True, nullable=False)
@@ -44,7 +53,8 @@ class User(Base):
     def __repr__(self):
         return "{} <{}>".format(self.name, self.email)
 
-class Interval(Base):
+
+class Interval(__base__):
     """
     define intervals
     """
@@ -66,13 +76,15 @@ class Interval(Base):
         }
 
 
-class Rate(Base):
+class Rate(__base__):
     """
     currenciess and rates
     """
     __tablename__ = 'rates'
     __table_args__ = (
-        PrimaryKeyConstraint('rate_date', 'currency_a_id', 'currency_b_id', 'rate'),
+        PrimaryKeyConstraint(
+            'rate_date', 'currency_a_id', 'currency_b_id', 'rate'
+        ),
     )
     #  record_id = Column(Integer, primary_key=True, name='id')
     rate_date = Column(DateTime)
@@ -85,7 +97,9 @@ class Rate(Base):
     rate = Column(Numeric(15, 4), nullable=False)
 
     def __repr__(self):
-        return "{}={:.4f}*{}".format(self.currency_b, self.rate, self.currency_a)
+        return "{}={:.4f}*{}".format(
+            self.currency_b, self.rate, self.currency_a
+        )
 
     def to_dict(self):
         """convert object to dict/json"""
@@ -98,7 +112,7 @@ class Rate(Base):
         }
 
 
-class Currency(Base):
+class Currency(__base__):
     """
     currencies definitions
     """
@@ -111,7 +125,7 @@ class Currency(Base):
 
     def get_rate(self):
         """return current rate"""
-        return db_session.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
+        return DB_SESSION.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
             Rate.rate_date.desc()).first()
 
     def __repr__(self):
@@ -127,7 +141,7 @@ class Currency(Base):
             }
 
 
-class UserCurrencies(Base):
+class UserCurrencies(__base__):
     """ link users to currencies
     """
 
@@ -142,7 +156,7 @@ class UserCurrencies(Base):
     default = Column(Boolean, default=False, nullable=False)
 
 
-class Income(Base):
+class Income(__base__):
     """income and expenditure
 
     all periodic and not income and expenditure
@@ -153,7 +167,7 @@ class Income(Base):
     title = Column(String)
     currency_id = Column(Integer, ForeignKey('currency.id'))
     currency = relationship('Currency')
-    sum = Column(Numeric(12, 2))
+    summ = Column(Numeric(12, 2))
     start_date = Column(Date)
     end_date = Column(Date, nullable=True)
     period_id = Column(Integer, ForeignKey('intervals.id'))
@@ -170,16 +184,26 @@ class Income(Base):
             'id': self.record_id,
             'title': self.title,
             'currency': self.currency,
-            'sum': "{:.2f}".format(self.sum),
+            'summ': "{:.2f}".format(self.summ),
             'start_date': self.start_date.isoformat(),
             'end_date': (None if self.end_date is None else self.end_date.isoformat()),
             'period': self.period
         }
 
     def get_backlog(self, max_date):
+        """[summary]
+
+
+        Arguments:
+            max_date {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
+
         backlog = []
 
-        (last_payment,) = db_session.query(func.max(Transaction.time)).filter(
+        (last_payment,) = DB_SESSION.query(func.max(Transaction.time)).filter(
             Transaction.income_id == self.record_id).first()
         if last_payment is None:
             last_payment = self.start_date
@@ -190,7 +214,7 @@ class Income(Base):
                 'id': 0,
                 'time': i,
                 'origin_time': i,
-                'sum': "{:.2f}".format(self.sum),
+                'summ': "{:.2f}".format(self.summ),
                 'income': self,
                 'comment': ''
             })
@@ -220,13 +244,13 @@ class Income(Base):
         # print(_start_date, _end_date, _next_date)
         while _next_date <= _end_date:
             if _next_date >= _start_date and _next_date <= _end_date:
-                #s += int(self.sum)
+                #s += int(self.summ)
                 list_dates.append(_next_date)
             _next_date = next_date(_next_date, (self.period.value, self.period.item))
         # print(list_dates)
         if ignore_pf:
             return list_dates
-        pf_dates = db_session.query(Payforward.income_date).filter(
+        pf_dates = DB_SESSION.query(Payforward.income_date).filter(
             and_(Payforward.income_id == self.record_id,
                  and_(Payforward.income_date >= _start_date,
                       Payforward.income_date <= _end_date))).all()
@@ -238,18 +262,18 @@ class Income(Base):
                 pass
         return list_dates
 
-    def get_sum(
+    def get_summ(
             self,
             start_date=date.today(),
             end_date=date.today().replace(year=(date.today().year + 1)),
             ignore_pf=False):
         try:
-            return len(self.get_dates(start_date, end_date, ignore_pf)) * int(self.sum)
+            return len(self.get_dates(start_date, end_date, ignore_pf)) * int(self.summ)
         except IndexError:
             return 0
 
 
-class Account(Base):
+class Account(__base__):
     """
     accounts
     """
@@ -270,30 +294,48 @@ class Account(Base):
             'id': self.record_id,
             'title': self.title,
             'currency': self.currency,
-            'sum': "{:.2f}".format(self.sum()),
+            'balance': "{:.2f}".format(self.balance()),
             'visible': self.visible,
             'deleted': self.deleted
         }
 
-    def sum(self):
-        r = db_session.query(
+    def fix_balance(self, n_balance, n_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):
+        delta = n_balance - self.balance(n_date)
+        if delta == 0:
+            return 0
+        transaction = Transaction(
+            time=n_date, summ=delta,
+            account_id=self.record_id, user_id=self.user_id,
+            comment='fix account summ'
+            )
+        DB_SESSION.add(transaction)
+        return transaction.record_id
+
+
+    def balance(self, end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):
+        result = DB_SESSION.query(
             Transaction.account_id,
-            func.sum(Transaction.sum).label('total')
+            func.sum(Transaction.summ).label('total')
         ).filter(
-            Transaction.account_id == self.record_id
+            and_(
+                Transaction.account_id == self.record_id,
+                Transaction.time <= end_date
+            )
         ).group_by(Transaction.account_id).first()
-        if r:
-            return r[1]
+        if result:
+            return result[1]
         return Decimal(0.0)
 
 
     def __repr__(self):
         return "{:10s}".format(self.title)
 
+class Transaction(__base__):
+    """transactions
 
-class Transaction(Base):
+    list of transactions
     """
-    """
+
     __tablename__ = 'transactions'
     record_id = Column(Integer, primary_key=True, name='id')
     time = Column(Date, nullable=False)
@@ -301,7 +343,7 @@ class Transaction(Base):
     account = relationship("Account")
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship('User')
-    sum = Column(Numeric(12, 2), nullable=False)
+    summ = Column(Numeric(12, 2), nullable=False)
     transfer = Column(Integer, ForeignKey('transactions.id'),
                       nullable=True)  # id of exchange/transfer operation
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
@@ -315,7 +357,7 @@ class Transaction(Base):
             "id": self.record_id,
             "time": self.time.isoformat(),
             "account": self.account,
-            "sum": "{:.2f}".format(self.sum),
+            "summ": "{:.2f}".format(self.summ),
             "transfer": self.transfer,
             "income": self.income,
             "comment": self.comment
@@ -323,10 +365,10 @@ class Transaction(Base):
 
     def __repr__(self):
         return "{:6d} {} {} {} {} {}".format(self.record_id, self.time, self.account,
-                                             self.sum, self.transfer, self.income)
+                                             self.summ, self.transfer, self.income)
 
 
-class Payforward(Base):
+class Payforward(__base__):
     """table of regular payments which was payed before described date
 
     """
@@ -343,22 +385,22 @@ class Payforward(Base):
 
 
 
-Base.metadata.create_all(engine)
+__base__.metadata.create_all(__engine__)
 #  DB = session()
 
 if __name__ == '__main__':
-    rr = aliased(Rate)
-    s = select([
+    SUB_SELECT = select([
         Rate.currency_b_id.label("b_id"),
         func.max(Rate.rate_date).label("rate_date")
     ]).group_by(Rate.currency_b_id).alias('s')
 
     print(
-        db_session.query(
+        DB_SESSION.query(
             Rate.currency_b_id,
             Rate.rate,
             Rate.rate_date
-        ).join(s, and_(s.c.b_id == Rate.currency_b_id, s.c.rate_date == Rate.rate_date))
+        ).join(SUB_SELECT,
+               and_(SUB_SELECT.c.b_id == Rate.currency_b_id, SUB_SELECT.c.rate_date == Rate.rate_date))
         .all()
     )
     """

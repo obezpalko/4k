@@ -63,7 +63,7 @@
                             title: $("#accounts [name='title']").val(),
                             currency: $("#accounts [name='currency.id']").val(),
                             visible: $("#accounts [name='visible']").prop('checked'),
-                            sum: $("#accounts [name='sum']").val()
+                            balance: $("#accounts [name='balance']").val()
                         };
                         //console.log('insert' + JSON.stringify(data));
                         json_api_call('PUT', '/api/account', data,
@@ -90,7 +90,7 @@
                                 title: $("#accounts [name='title']").val(),
                                 currency: $("#accounts [name='currency.id']").val(),
                                 visible: $("#accounts [name='visible']").prop('checked'),
-                                sum: $("#accounts [name='sum']").val()
+                                balance: $("#accounts [name='balance']").val()
                             },
                             function(data) {
                                 location.reload();
@@ -132,7 +132,7 @@
                     $("#accounts [name='currency.id']").val(data['currency']['id']);
                     $("#accounts [name='visible']").prop('checked', data['visible']);
 
-                    $("#accounts [name='sum']").val(data['sum']);
+                    $("#accounts [name='balance']").val(data['balance']);
                     $('#accounts').dialog({
                         buttons: buttons
                     }).focus();
@@ -160,7 +160,7 @@
         <dd><input type="checkbox" name=visible class=form_save>
         </dd>
         <dt>Summ</dt>
-        <dd><input name=sum class=form_save size=10></dd>
+        <dd><input name=balance class=form_save size=10></dd>
     </dl>
 </form>
 

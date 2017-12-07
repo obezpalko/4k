@@ -1,5 +1,5 @@
 """
-main programm
+main programm.
 """
 
 import json
@@ -10,8 +10,8 @@ from flask import Flask, request, url_for, redirect, session, \
 # from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy_session import flask_scoped_session
 from sqlalchemy import func, and_, select
-from .oauth import google, REDIRECT_URI, get_user_info
-from .database import DB_URL, db_session, User, \
+from .oauth import GOOGLE, REDIRECT_URI, get_user_info
+from .database import DB_URL, DB_SESSION, User, \
     UserCurrencies, Currency, Account, Rate, Transaction, json_serial
 from .utils import strip_numbers
 
@@ -19,17 +19,18 @@ __version__ = "1.0.1"
 
 APP = Flask(__name__)  # create the application instance :)
 APP.config.from_object(__name__)  # load config from this file , flaskr.py
-DB = flask_scoped_session(db_session, APP)
+DB = flask_scoped_session(DB_SESSION, APP)
+SECRET = 'icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy'
 
 # Load default config and override config from an environment variable
 APP.config.update(dict(
-    SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
+    SECRET_KEY=SECRET,
     PREFERRED_URL_SCHEME='http',
     SESSION_TYPE='sqlalchemy',
     SQLALCHEMY_DATABASE_URI=DB_URL,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     DEBUG=True
-    ))
+))
 
 APP.config.from_envvar('E4_SETTINGS', silent=True)
 
@@ -39,7 +40,7 @@ def shutdown_session(exc=None):
     """ clean database session on errors """
     if exc is None:
         pass
-    db_session.remove()
+    DB_SESSION.remove()
 
 
 @APP.route('/')
@@ -57,11 +58,11 @@ def index():
 def login():
     """ login hook """
     callback = url_for('authorized', _external=True)
-    return google.authorize(callback=callback)
+    return GOOGLE.authorize(callback=callback)
 
 
 @APP.route(REDIRECT_URI)
-@google.authorized_handler
+@GOOGLE.authorized_handler
 def authorized(resp):
     """ authorize user from google """
     access_token = resp['access_token']
@@ -86,7 +87,7 @@ def check_user(userinfo):
     return user.user_id
 
 
-@google.tokengetter
+@GOOGLE.tokengetter
 def get_access_token():
     """ return session token """
     return session.get('access_token')
@@ -96,7 +97,7 @@ def get_access_token():
 def logout():
     """ log user out and clear session """
     session.pop('user', '')
-    return redirect(url_for('index')) #  , _external=True, _scheme='https'))
+    return redirect(url_for('index'))  # , _external=True, _scheme='https'))
 
 
 @APP.route('/accounts')
@@ -124,12 +125,14 @@ def currency():
     subq = DB.query(UserCurrencies).filter(
         UserCurrencies.user_id == session['user'][0]).subquery('userq')
     currencies = DB.query(Currency, subq).outerjoin(
-        subq, subq.c.currency_id == Currency.record_id).order_by(Currency.name).all()
+        subq, subq.c.currency_id == Currency.record_id).order_by(
+            Currency.name).all()
     return render_template(
         "currency.html",
         currencies=currencies,
         user=DB.query(User).get(session['user'][0])
     )
+
 
 def currency_get(**kwargs):
     '''
@@ -152,7 +155,8 @@ def currency_get(**kwargs):
     entries = []
     if 'id' in kwargs and kwargs['id']:
         try:
-            return rates_query.filter(Rate.currency_b_id == kwargs['id']).first()[1].to_dict()
+            return rates_query.filter(
+                Rate.currency_b_id == kwargs['id']).first()[1].to_dict()
         except TypeError:
             return []
     else:
@@ -180,13 +184,17 @@ def usercurrency_put(**kwargs):
             and_(
                 UserCurrencies.user_id == session['user'][0],
                 UserCurrencies.currency_id != kwargs['id'])
-            ).update({UserCurrencies.default: False}, synchronize_session='evaluate')
+            ).update(
+                {UserCurrencies.default: False},
+                synchronize_session='evaluate')
         updated = DB.query(UserCurrencies).filter(
             and_(
                 UserCurrencies.user_id == session['user'][0],
                 UserCurrencies.currency_id == kwargs['id']
                 )
-            ).update({UserCurrencies.default: True}, synchronize_session='evaluate')
+            ).update(
+                {UserCurrencies.default: True},
+                synchronize_session='evaluate')
         if updated == 0:
             # if not updated nothing - inser new record
             DB.add(UserCurrencies(
@@ -201,6 +209,7 @@ def usercurrency_put(**kwargs):
             ))
     DB.commit()
     return {'result': 'Ok'}
+
 
 def usercurrency_delete(**kwargs):
     ''' delete user currency '''
@@ -223,12 +232,12 @@ def account_post(**kwargs):
         account.title = obj['title']
     if 'currency' in obj:
         account.currency_id = obj['currency']
-    if 'sum' in obj:
-        delta_sum = Decimal(strip_numbers(obj['sum'])) - account.sum()
-        if delta_sum != 0:
-            print('sum update required')
+    if 'balance' in obj:
+        delta_summ = Decimal(strip_numbers(obj['balance'])) - account.balance()
+        if delta_summ != 0:
+            print('summ update required')
             transaction = Transaction(
-                time=date.today(), sum=delta_sum,
+                time=date.today(), summ=delta_summ,
                 account_id=kwargs['id'], user_id=session['user'][0],
                 comment='fix account summ')
             DB.add(transaction)
@@ -246,6 +255,9 @@ def account_put(**kwargs):
         visible=obj['visible']
     )
     DB.add(new_account)
+    if 'balance' in obj:
+        DB.flush()
+        new_account.fix_balance(Decimal(obj['balance']))
     print("kwargs: {}".format(kwargs))
     DB.commit()
 
@@ -259,7 +271,7 @@ def account_get(**kwargs):
             "id": 0,
             "title": "",
             "currency": {"id": 1},
-            "sum": 0.00,
+            "balance": 0.00,
             "visible": True,
             "deleted": False
         }
@@ -268,6 +280,7 @@ def account_get(**kwargs):
             Account.record_id == kwargs['id'],
             Account.user_id == session['user'][0]
         )).first()
+
 
 def account_delete(**kwargs):
     ''' mark account as deleted if there are transactions '''
@@ -281,8 +294,13 @@ def account_delete(**kwargs):
     return {'deleted': kwargs['id']}
 
 
-@APP.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST', 'PUT'])
-@APP.route('/api/<string:api>/<int:id>', methods=['GET', 'DELETE', 'PUT', 'POST'])
+@APP.route(
+    '/api/<string:api>',
+    defaults={'id': 0},
+    methods=['GET', 'POST', 'PUT'])
+@APP.route(
+    '/api/<string:api>/<int:id>',
+    methods=['GET', 'DELETE', 'PUT', 'POST'])
 def main_dispatcher(**kwargs):
     """ main dispatcher """
     if 'user' not in session:
