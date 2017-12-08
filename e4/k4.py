@@ -12,7 +12,8 @@ from flask_sqlalchemy_session import flask_scoped_session
 from sqlalchemy import func, and_, select
 from .oauth import GOOGLE, REDIRECT_URI, get_user_info
 from .database import DB_URL, DB_SESSION, User, \
-    UserCurrencies, Currency, Account, Rate, Transaction, json_serial
+    UserCurrencies, Currency, Account, Rate, Transaction, \
+    DBJsonEncoder
 from .utils import strip_numbers
 
 __version__ = "1.0.1"
@@ -156,12 +157,12 @@ def currency_get(**kwargs):
     if 'id' in kwargs and kwargs['id']:
         try:
             return rates_query.filter(
-                Rate.currency_b_id == kwargs['id']).first()[1].to_dict()
+                Rate.currency_b_id == kwargs['id']).first()[1].json
         except TypeError:
             return []
     else:
         for rate in rates_query.all():
-            entries.append(rate[1].to_dict())
+            entries.append(rate[1].json)
     return entries
 
 
@@ -311,7 +312,7 @@ def main_dispatcher(**kwargs):
             globals()["{}_{}".format(
                 kwargs['api'],
                 str(request.method).lower())](**kwargs),
-            default=json_serial
+            cls=DBJsonEncoder
             ),
         status=200,
         mimetype="application/json")

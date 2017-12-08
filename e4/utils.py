@@ -16,8 +16,8 @@ def dict_factory(cursor, row):
     return result
 
 
-def to_dict(arr, id_="id"):
-    """ convert arrya to dict """
+def to_dict(arr, id_='id'):
+    """ convert array to dict """
     result = {}
     if isinstance(arr, dict):
         return arr
@@ -53,5 +53,5 @@ def number_of_weeks(date1, date2):
 
 
 def strip_numbers(number):
-    ''' replace accidentally entered instead decimal dot chars'''
+    """ replace accidentally entered instead decimal dot chars """
     return number.replace('ю', '.').replace('ץ', '.').replace(',', '.').replace(' ', '')

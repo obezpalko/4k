@@ -3,6 +3,7 @@
 """
 database and tables
 """
+import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from sqlalchemy import and_, func, create_engine, select, \
@@ -11,6 +12,7 @@ from sqlalchemy import and_, func, create_engine, select, \
 from sqlalchemy.orm import scoped_session, relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from .utils import next_date
+
 
 DB_URL = "postgresql://e4:og8ozJoch\\Olt6@localhost:5432/e4"
 
@@ -22,21 +24,19 @@ DB_SESSION = scoped_session(sessionmaker(autocommit=False,
 __base__ = declarative_base()
 __base__.query = DB_SESSION.query_property()
 
-
-def json_serial(obj):
-    """JSON serializer for objects not serializable by default json code"""
-
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    if isinstance(obj,
-                  (Currency, Income, Rate, Interval, Transaction, Account)):
-        return obj.to_dict()
-    if isinstance(obj, Decimal):
-        return format(obj.__str__())
-    raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
+class DBJsonEncoder(json.JSONEncoder):  # pylint: disable=C0111
+    def default(self, obj):  # pylint: disable=E0202,W0221
+        if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
+            return obj.json
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return format(obj.__str__())
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
 
 
-class User(__base__):
+class User(__base__):  # pylint: disable=R0903
     """ user table.
 
     processing users
@@ -53,8 +53,19 @@ class User(__base__):
     def __repr__(self):
         return "{} <{}>".format(self.name, self.email)
 
+    @property
+    def json(self):  # pylint: disable=C0111
+        return {
+            'id':       self.user_id,
+            'email':    self.email,
+            'name':     self.name,
+            'gender':   self.gender,
+            'link':     self.link,
+            'picture':  self.picture
+        }
 
-class Interval(__base__):
+
+class Interval(__base__):  # pylint: disable=R0903
     """
     define intervals
     """
@@ -67,16 +78,18 @@ class Interval(__base__):
     def __repr__(self):
         return "{}:{}{}".format(self.title, self.value, self.item)
 
-    def to_dict(self):
+    @property
+    def json(self):  # pylint: disable=C0111
         return {
-            "id": self.record_id,
-            "title": self.title,
-            "item": self.item,
-            "value": self.value
+            'id':       self.record_id,
+            'title':    self.title,
+            'item':     self.item,
+            'value':    self.value
         }
 
 
-class Rate(__base__):
+
+class Rate(__base__):  # pylint: disable=R0903
     """
     currenciess and rates
     """
@@ -100,8 +113,8 @@ class Rate(__base__):
         return "{}={:.4f}*{}".format(
             self.currency_b, self.rate, self.currency_a
         )
-
-    def to_dict(self):
+    @property
+    def json(self):  # pylint: disable=C0111
         """convert object to dict/json"""
         return {
             "id": self.currency_b_id,
@@ -121,9 +134,10 @@ class Currency(__base__):
     title = Column(String)
     name = Column(String)
     symbol = Column(CHAR)
-    rate = relationship("Rate", foreign_keys=[Rate.currency_b_id])
+    rate_rel = relationship("Rate", foreign_keys=[Rate.currency_b_id])
 
-    def get_rate(self):
+    @property
+    def rate(self):
         """return current rate"""
         return DB_SESSION.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
             Rate.rate_date.desc()).first()
@@ -131,17 +145,18 @@ class Currency(__base__):
     def __repr__(self):
         return "{}".format(self.title)
 
-    def to_dict(self):
+    @property
+    def json(self): # pylint: disable=C0111
         """convert object to dict/json"""
         return {
-            'id': self.record_id,
-            'title': self.title,
-            'name': self.name,
-            'rate': self.get_rate()
+            'id':       self.record_id,
+            'title':    self.title,
+            'name':     self.name,
+            'rate':     self.get
             }
 
 
-class UserCurrencies(__base__):
+class UserCurrencies(__base__):  # pylint: disable=R0903
     """ link users to currencies
     """
 
@@ -178,16 +193,17 @@ class Income(__base__):
     def __repr__(self):
         return "{:20s} {}".format(self.title, self.currency)
 
-    def to_dict(self):
+    @property
+    def json(self):  # pylint: disable=C0111
         """convert object to dict/json"""
         return {
-            'id': self.record_id,
-            'title': self.title,
-            'currency': self.currency,
-            'summ': "{:.2f}".format(self.summ),
-            'start_date': self.start_date.isoformat(),
-            'end_date': (None if self.end_date is None else self.end_date.isoformat()),
-            'period': self.period
+            'id':           self.record_id,
+            'title':        self.title,
+            'currency':     self.currency,
+            'summ':         "{:.2f}".format(self.summ),
+            'start_date':   self.start_date.isoformat(),
+            'end_date':     (None if self.end_date is None else self.end_date.isoformat()),
+            'period':       self.period
         }
 
     def get_backlog(self, max_date):
@@ -220,10 +236,7 @@ class Income(__base__):
             })
         return backlog
 
-    def get_dates(self,
-                  start_date=date.today(),
-                  end_date=date.today().replace(year=(date.today().year+1)),
-                  ignore_pf=False):
+    def get_dates(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year+1)), ignore_pf=False):   # pylint: disable=C0111,C0301
         list_dates = []
         # s = 0
         _start_date = max(start_date, self.start_date)
@@ -262,11 +275,7 @@ class Income(__base__):
                 pass
         return list_dates
 
-    def get_summ(
-            self,
-            start_date=date.today(),
-            end_date=date.today().replace(year=(date.today().year + 1)),
-            ignore_pf=False):
+    def get_summ(self, start_date=date.today(), end_date=date.today().replace(year=(date.today().year + 1)), ignore_pf=False):  # pylint: disable=C0111,C0301
         try:
             return len(self.get_dates(start_date, end_date, ignore_pf)) * int(self.summ)
         except IndexError:
@@ -288,7 +297,8 @@ class Account(__base__):
     deleted = Column(Boolean, default=False)
     visible = Column(Boolean, default=True)
 
-    def to_dict(self):
+    @property
+    def json(self):  # pylint: disable=C0111
         """convert object to dict/json"""
         return {
             'id': self.record_id,
@@ -299,7 +309,7 @@ class Account(__base__):
             'deleted': self.deleted
         }
 
-    def fix_balance(self, n_balance, n_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):
+    def fix_balance(self, n_balance, n_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):   # pylint: disable=C0111
         delta = n_balance - self.balance(n_date)
         if delta == 0:
             return 0
@@ -312,7 +322,7 @@ class Account(__base__):
         return transaction.record_id
 
 
-    def balance(self, end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):
+    def balance(self, end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):   # pylint: disable=C0111
         result = DB_SESSION.query(
             Transaction.account_id,
             func.sum(Transaction.summ).label('total')
@@ -330,7 +340,7 @@ class Account(__base__):
     def __repr__(self):
         return "{:10s}".format(self.title)
 
-class Transaction(__base__):
+class Transaction(__base__):  # pylint: disable=R0903
     """transactions
 
     list of transactions
@@ -350,17 +360,17 @@ class Transaction(__base__):
     income = relationship("Income")  # , back_populates='transactions')
     comment = Column(Text)
 
-
-    def to_dict(self):
+    @property
+    def json(self):  # pylint: disable=C0111
         """convert object to dict/json"""
         return {
-            "id": self.record_id,
-            "time": self.time.isoformat(),
-            "account": self.account,
-            "summ": "{:.2f}".format(self.summ),
+            "id":       self.record_id,
+            "time":     self.time.isoformat(),
+            "account":  self.account,
+            "summ":     "{:.2f}".format(self.summ),
             "transfer": self.transfer,
-            "income": self.income,
-            "comment": self.comment
+            "income":   self.income,
+            "comment":  self.comment
         }
 
     def __repr__(self):
@@ -368,7 +378,7 @@ class Transaction(__base__):
                                              self.summ, self.transfer, self.income)
 
 
-class Payforward(__base__):
+class Payforward(__base__):  # pylint: disable=R0903
     """table of regular payments which was payed before described date
 
     """
