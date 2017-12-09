@@ -8,8 +8,8 @@ function getFormData() {
     return {
         title: $("#incomes [name='title']").val(),
         currency: $("#incomes [name='currency.id']").val(),
-        start_date: $("#incomes [name='start_date']").val(),
-        end_date: $("#incomes [name='end_date']").val(),
+        "start_date": $("#incomes [name='start_date']").val(),
+        "end_date": $("#incomes [name='end_date']").val(),
         period: $("#incomes [name='period']").val(),
         summ: $("#incomes [name='summ']").val()
     };
@@ -49,7 +49,7 @@ $(function() {
                 $("#incomes [name='start_date']").val(data.start_date);
                 $("#incomes [name='end_date']").val(data.end_date);
                 $("#incomes [name='summ']").val(data.summ);
-                $('#incomes').dialog({
+                $("#incomes").dialog({
                     buttons
                 }).focus();
             },

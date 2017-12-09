@@ -42,8 +42,8 @@ function loadCurrencies(url) {
     var r = "";
     $.ajax({
         dataType: "json",
-        url: url,
-        success: function(data) {
+        url,
+        success(data) {
             $.each(data, function(key, val) {
                 r += "<option value='" + val.id + "'>" + val.symbol + " " + val.title +
                     "</option>\n";
@@ -59,7 +59,7 @@ function loadPeriods(url) {
     $.ajax({
         dataType: "json",
         url: url,
-        success: function(data) {
+        success(data) {
             $.each(data, function(key, val) {
                 r += "<option value='" + val.id + "'>" + val.title +
                     "</option>\n";

@@ -54,7 +54,7 @@ $(function() {
     $(".account_edit").click(function() {
         var accountid = $(this).attr("href").substring(1);
         var buttons = [];
-        if (accountid === '0') {
+        if (accountid === "0") {
             // new account
             buttons = [{
                 text: "Insert",
@@ -91,7 +91,7 @@ $(function() {
 
                 $("#accounts [name='balance']").val(data.balance);
                 $("#accounts").dialog({
-                    buttons: buttons
+                    buttons
                 }).focus();
             },
             function() {}

@@ -324,7 +324,8 @@ def income_get(**kwargs):
             "period":  {"id": 4},
             "user_id": session['user'][0],
             "account_id": None,
-            "is_credit": False
+            "is_credit": False,
+            "deleted": False
         }
     return DB.query(Income).filter(
         and_(
