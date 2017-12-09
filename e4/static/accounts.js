@@ -22,6 +22,14 @@ function jsonapicall(method, url, data, func_success = function() {
     });
 }
 
+function getFormData() {
+    return {
+        title: $("#accounts [name='title']").val(),
+        currency: $("#accounts [name='currency.id']").val(),
+        visible: $("#accounts [name='visible']").prop('checked'),
+        balance: $("#accounts [name='balance']").val()
+    };
+}
 
 
 $(function() {
@@ -46,12 +54,6 @@ $(function() {
     $('.account_edit').click(function() {
         var accountid = $(this).attr('href').substring(1);
         var buttons = [];
-        var form_data = {
-            title: $("#accounts [name='title']").val(),
-            currency: $("#accounts [name='currency.id']").val(),
-            visible: $("#accounts [name='visible']").prop('checked'),
-            balance: $("#accounts [name='balance']").val()
-        };
         if (accountid === '0') {
             // new account
             buttons = [{
@@ -59,7 +61,7 @@ $(function() {
                 click: function() {
 
                     //console.log('insert' + JSON.stringify(data));
-                    jsonapicall('PUT', '/api/account', form_data);
+                    jsonapicall('PUT', '/api/account', getFormData());
                 }
             }];
         } else {
@@ -68,7 +70,7 @@ $(function() {
             buttons = [{
                 text: 'Change',
                 click: function() {
-                    jsonapicall('POST', '/api/account/' + accountid, form_data);
+                    jsonapicall('POST', '/api/account/' + accountid, getFormData());
 
                 }
             }, {

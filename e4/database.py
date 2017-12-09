@@ -191,6 +191,7 @@ class Income(__base__):
     account_id = Column(Integer, ForeignKey('accounts.id'), nullable=True)
     account = relationship('Account')
     is_credit = Column(Boolean, default=False)
+    deleted = Column(Boolean, default=False)
 
     def __repr__(self):
         return "{:20s} {}".format(self.title, self.currency)
@@ -362,7 +363,7 @@ class Transaction(__base__):  # pylint: disable=R0903
                       nullable=True)  # id of exchange/transfer operation
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
     income = relationship("Income")  # , back_populates='transactions')
-    comment = Column(Text)
+    comments = Column(Text)
 
     @property
     def json(self):  # pylint: disable=C0111

@@ -4,7 +4,7 @@ main programm.
 
 import json
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from flask import Flask, request, url_for, redirect, session, \
     render_template, Response
 # from flask_sqlalchemy import SQLAlchemy
@@ -108,7 +108,10 @@ def incomes():
     return render_template(
         "incomes.html",
         incomes=DB.query(Income).filter(
-            Income.user_id == session['user'][0]
+            and_(
+                Income.user_id == session['user'][0],
+                Income.deleted != True
+            )
             ).order_by(Income.start_date, Income.title).all(),
         user=DB.query(User).get(session['user'][0])
     )
@@ -239,7 +242,8 @@ def usercurrency_delete(**kwargs):
 def account_post(**kwargs):
     ''' update account '''
     obj = json.loads(request.data.decode('utf-8', 'strict'))
-    account = account = DB.query(Account).get(kwargs['id'])
+    print('obj: {}'.format(obj))
+    account = DB.query(Account).get(kwargs['id'])
     if 'visible' in obj:
         account.visible = obj['visible']
     if 'title' in obj:
@@ -327,6 +331,62 @@ def income_get(**kwargs):
             Income.record_id == kwargs['id'],
             Income.user_id == session['user'][0]
         )).first()
+
+def income_put(**kwargs):  # pylint: disable=W0613
+    ''' add income '''
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    new_income = Income(
+        title=obj['title'],
+        currency_id=int(obj['currency']),
+        user_id=session['user'][0],
+        summ=Decimal(obj['summ']),
+        start_date=datetime.strptime(
+            obj['start_date'], '%Y-%m-%d').date(),
+        end_date=(None if obj['end_date'] == '' else datetime.strptime(
+            obj['end_date'], '%Y-%m-%d').date()),
+        period_id=int(obj['period'])
+    )
+    # print('kwargs: {}'.format(kwargs))
+    print('obj: {}'.format(obj))
+    # print('new_income: {}'.format(new_income.json))
+    DB.add(new_income)
+    DB.commit()
+    return {'result': 'Ok', 'id': new_income.record_id}
+
+
+def income_post(**kwargs):
+    ''' update income '''
+    obj = json.loads(request.data.decode('utf-8', 'strict'))
+    print('obj: {}'.format(obj))
+    income = DB.query(Income).get(kwargs['id'])
+    if income.title != obj['title']:
+        income.title = obj['title']
+    if income.currency_id != int(obj['currency']):
+        income.currency_id = int(obj['currency'])
+    if income.summ != Decimal(obj['summ']):
+        income.summ = Decimal(obj['summ'])
+    new_start_date = datetime.strptime(obj['start_date'], '%Y-%m-%d').date()
+    if income.start_date != new_start_date:
+        income.start_date = new_start_date
+    new_end_date = (None if obj['end_date'] == '' else datetime.strptime(obj['end_date'], '%Y-%m-%d').date())
+    if income.end_date != new_end_date:
+        income.end_date = new_end_date
+    if income.period_id != int(obj['period']):
+        income.period_id = int(obj['period'])
+    DB.commit()
+    return {'result': 'Ok'}
+
+
+def income_delete(**kwargs):
+    ''' mark income as deleted if there are transactions '''
+    income = DB.query(Income).get(kwargs['id'])
+    # TODO: check and delete if all transactions are in future. perhaps, just delete all the transactions
+    if DB.query(Transaction).filter(Transaction.income_id == kwargs['id']).count() > 0:
+        income.deleted = True
+    else:
+        DB.query(Income).filter(Income.record_id == kwargs['id']).delete()
+    DB.commit()
+    return {'deleted': kwargs['id']}
 
 def period_get(**kwargs):
     ''' period api '''
