@@ -16,34 +16,31 @@ function getFormData() {
 }
 $(function() {
 
-    $('.income_edit').click(function() {
-        var incomeid = $(this).attr('href').substring(1);
+    $(".income_edit").click(function() {
+        var incomeid = $(this).attr("href").substring(1);
         var buttons = [{
-            text: 'Insert',
-            click: function() {
-                jsonApiCall('PUT', '/api/income', getFormData(), $("#incomes"));
+            text: "Insert",
+            click() {
+                jsonApiCall("PUT", "/api/income", getFormData(), $("#incomes"));
             }
         }];
-
-
-        console.log('presses ' + incomeid + ' ' + JSON.stringify(getFormData()));
-        if (incomeid !== '0') {
+        if (incomeid !== "0") {
             buttons = [{
-                text: 'Change',
-                click: function() {
-                    jsonApiCall('POST', '/api/income/' + incomeid, getFormData(), $("#incomes"));
+                text: "Change",
+                click() {
+                    jsonApiCall("POST", "/api/income/" + incomeid, getFormData(), $("#incomes"));
                 }
             }, {
-                text: 'Delete',
-                click: function() {
-                    jsonApiCall('DELETE', '/api/income/' + incomeid, {
+                text: "Delete",
+                click() {
+                    jsonApiCall("DELETE", "/api/income/" + incomeid, {
                         delete: incomeid
                     }, $("#incomes"));
                 }
             }];
         }
 
-        jsonApiCall('GET', '/api/income/' + incomeid, null, $("incomes"),
+        jsonApiCall("GET", "/api/income/" + incomeid, null, $("incomes"),
             function(data) {
                 $("#incomes [name='id']").val(data.id);
                 $("#incomes [name='title']").val(data.title);
@@ -53,7 +50,7 @@ $(function() {
                 $("#incomes [name='end_date']").val(data.end_date);
                 $("#incomes [name='summ']").val(data.summ);
                 $('#incomes').dialog({
-                    buttons: buttons
+                    buttons
                 }).focus();
             },
             function() {}

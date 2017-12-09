@@ -12,13 +12,13 @@
 //       return jsonnames(r.join("."), obj[n]);
 //     }
 // }
-function jsonApiCall(method, url, data, dialog_obj, func_success = function() {
+function jsonApiCall(method, url, data, dialogObj, funcSuccess = function() {
     location.reload();
-    dialog_obj.dialog("close");
+    dialogObj.dialog("close");
     return false;
-}, func_error = function(data) {
+}, funcError = function(data) {
     alert("error on \n" + JSON.stringify(data));
-    dialog_obj.dialog("close");
+    dialogObj.dialog("close");
     return false;
 }) {
     $.ajax({
@@ -28,17 +28,17 @@ function jsonApiCall(method, url, data, dialog_obj, func_success = function() {
             "Content-Type": "application/json"
         },
         dataType: "json",
-        url: url,
+        url,
         data: ((data != null) ? JSON.stringify(data) : null),
-        success: func_success,
-        error: func_error
+        success: funcSuccess,
+        error: funcError
 
     });
 }
 
 
 function loadCurrencies(url) {
-    if ($("select.currency_picker").length == 0) { return false; }
+    if ($("select.currency_picker").length === 0) { return false; }
     var r = "";
     $.ajax({
         dataType: "json",
@@ -54,7 +54,7 @@ function loadCurrencies(url) {
 }
 
 function loadPeriods(url) {
-    if ($("select.period_picker").length == 0) { return false; }
+    if ($("select.period_picker").length === 0) { return false; }
     var r = "";
     $.ajax({
         dataType: "json",
@@ -71,8 +71,8 @@ function loadPeriods(url) {
 
 
 $(function() {
-    loadCurrencies('/api/currency');
-    loadPeriods('/api/period');
+    loadCurrencies("/api/currency");
+    loadPeriods("/api/period");
     /* eslint object-curly-spacing: "off" */
     $(".datepicker").datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });
 });

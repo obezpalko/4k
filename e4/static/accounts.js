@@ -1,8 +1,8 @@
-function jsonapicall(method, url, data, func_success = function() {
+function jsonapicall(method, url, data, funcSuccess = function() {
     location.reload();
     $("#accounts").dialog("close");
     return false;
-}, func_error = function(data) {
+}, funcError = function(data) {
     alert("error on \n" + JSON.stringify(data));
     $("#accounts").dialog("close");
     return false;
@@ -14,10 +14,10 @@ function jsonapicall(method, url, data, func_success = function() {
             "Content-Type": "application/json"
         },
         dataType: "json",
-        url: url,
+        url,
         data: JSON.stringify(data),
-        success: func_success,
-        error: func_error
+        success: funcSuccess,
+        error: funcError
 
     });
 }
@@ -26,7 +26,7 @@ function getFormData() {
     return {
         title: $("#accounts [name='title']").val(),
         currency: $("#accounts [name='currency.id']").val(),
-        visible: $("#accounts [name='visible']").prop('checked'),
+        visible: $("#accounts [name='visible']").prop("checked"),
         balance: $("#accounts [name='balance']").val()
     };
 }
@@ -38,59 +38,59 @@ $(function() {
         jsonapicall(
             "POST",
             "/api/account/" + c, {
-                "visible": $(this).prop('checked')
+                "visible": $(this).prop("checked")
             },
             function(data) {
-                if (data.result != 'Ok') {
-                    $(this).prop('checked', false);
+                if (data.result !== "Ok") {
+                    $(this).prop("checked", false);
                 }
             },
             function() {
-                $(this).prop('checked', !$(this).prop('checked'));
+                $(this).prop("checked", !$(this).prop("checked"));
             }
 
         );
     });
-    $('.account_edit').click(function() {
-        var accountid = $(this).attr('href').substring(1);
+    $(".account_edit").click(function() {
+        var accountid = $(this).attr("href").substring(1);
         var buttons = [];
         if (accountid === '0') {
             // new account
             buttons = [{
-                text: 'Insert',
-                click: function() {
+                text: "Insert",
+                click() {
 
                     //console.log('insert' + JSON.stringify(data));
-                    jsonapicall('PUT', '/api/account', getFormData());
+                    jsonapicall("PUT", "/api/account", getFormData());
                 }
             }];
         } else {
             // modify account
 
             buttons = [{
-                text: 'Change',
-                click: function() {
-                    jsonapicall('POST', '/api/account/' + accountid, getFormData());
+                text: "Change",
+                click() {
+                    jsonapicall("POST", "/api/account/" + accountid, getFormData());
 
                 }
             }, {
-                text: 'Delete',
-                click: function() {
-                    jsonapicall('DELETE', '/api/account/' + accountid, {
+                text: "Delete",
+                click() {
+                    jsonapicall("DELETE", "/api/account/" + accountid, {
                         delete: accountid
                     });
                 }
             }];
         }
-        jsonapicall('GET', '/api/account/' + accountid, '',
+        jsonapicall("GET", "/api/account/" + accountid, null,
             function(data) {
                 $("#accounts [name='id']").val(data.id);
                 $("#accounts [name='title']").val(data.title);
                 $("#accounts [name='currency.id']").val(data.currency.id);
-                $("#accounts [name='visible']").prop('checked', data.visible);
+                $("#accounts [name='visible']").prop("checked", data.visible);
 
                 $("#accounts [name='balance']").val(data.balance);
-                $('#accounts').dialog({
+                $("#accounts").dialog({
                     buttons: buttons
                 }).focus();
             },

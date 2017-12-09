@@ -421,9 +421,3 @@ if __name__ == '__main__':
                and_(SUB_SELECT.c.b_id == Rate.currency_b_id, SUB_SELECT.c.rate_date == Rate.rate_date))
         .all()
     )
-    """
-        .join(
-            Rate.currency_b_id=="rr.currency_b_id"
-        )
-    )
-    """
