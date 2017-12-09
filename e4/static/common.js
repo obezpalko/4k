@@ -1,3 +1,7 @@
+/*g lobal
+loadCurrencies
+*/
+
 /*
 var balance_url;
 var d = new Date();
@@ -245,7 +249,7 @@ function reload_all() {
 }
 
 $(function() {
-    $(".datepicker").datepicker({ dateFormat: $.datepicker.W3C, changeYear: true });
+    
     $("#tabs").tabs();
     $('.ui-tabs-anchor').click(function() {
         load_table($(this).text() + '_table', '/api/' + $(this).text());

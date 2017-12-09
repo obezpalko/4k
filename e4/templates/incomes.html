@@ -1,0 +1,102 @@
+ {% extends "layout.html" %} {% if session.user %} {% block js %}
+<script src="{{ url_for('static', filename='incomes.js') }}"></script>
+<script>
+    $(function() {
+
+        $('.income_edit').click(function() {
+            var incomeid = $(this).attr('href').substring(1);
+            var buttons = [{
+                text: 'Insert',
+                click: function() {
+                    jsonApiCall('PUT', '/api/income', form_data, $("#incomes"));
+                }
+            }];
+
+            var form_data = {
+                title: $("#incomes [name='title']").val(),
+                currency: $("#incomes [name='currency.id']").val(),
+                visible: $("#incomes [name='visible']").prop('checked'),
+                balance: $("#incomes [name='balance']").val()
+            };
+            console.log('presses ' + incomeid + ' ' + JSON.stringify(form_data));
+            if (incomeid !== '0') {
+                buttons = [{
+                    text: 'Change',
+                    click: function() {
+                        jsonApiCall('POST', '/api/income/' + incomeid, form_data, $("#incomes"));
+                    }
+                }, {
+                    text: 'Delete',
+                    click: function() {
+                        jsonApiCall('DELETE', '/api/income/' + incomeid, {
+                            delete: incomeid
+                        });
+                    }
+                }];
+            }
+
+            jsonApiCall('GET', '/api/income/' + incomeid, null, $("incomes"),
+                function(data) {
+                    $("#incomes [name='id']").val(data.id);
+                    $("#incomes [name='title']").val(data.title);
+                    $("#incomes [name='currency.id']").val(data.currency.id);
+                    $("#incomes [name='period']").val(data.period.id);
+                    $("#incomes [name='start_date']").val(data.start_date);
+                    $("#incomes [name='end_date']").val(data.end_date);
+                    $("#incomes [name='summ']").val(data.summ);
+                    $('#incomes').dialog({
+                        buttons: buttons
+                    }).focus();
+                },
+
+                function() {}
+            );
+        });
+    });
+</script>
+{% endblock %} {% endif %} {% block body %} {% if session.user %}
+
+<form action="{{ url_for('main_dispatcher', api='income') }}" method=post class="add-entry hidden" id="incomes">
+    <dl>
+        <dt>ID</dt>
+        <dd><input type=text name=id class=id value="" size=4 disabled></dd>
+        <dt>Title</dt>
+        <dd><input type=text size=25 name=title value=""></dd>
+        <dt>Currency</dt>
+        <dd><select name=currency.id class="currency currency_selector currency_picker"></select></dd>
+        <dt>Period</dt>
+        <dd><select name=period class=period_picker></select></dd>
+        <dt>start</dt>
+        <dd><input name=start_date class=datepicker></dd>
+        <dt>end</dt>
+        <dd><input name=end_date class=datepicker></dd>
+        <dt>Summ</dt>
+        <dd><input name=summ size=10></dd>
+    </dl>
+</form>
+
+<table>
+    <tr>
+        <th>income <a href='#0' class="income_edit">+</a></th>
+        <th>summ</th>
+        <th>period</th>
+        <th>from</th>
+        <th>to</th>
+        <th>account</th>
+
+
+    </tr>
+    {% for income in incomes %}
+    <tr>
+        <td>
+            <a href='#{{ income.record_id }}' class="income_edit">{{ income.title }}</a>
+        </td>
+        <td>{{ income.summ }} <span class="currency_id hidden">{{ income.currency_id }}</span>{{ income.currency.symbol }}</td>
+        <td>{{income.period.title}}</td>
+        <td>{{ income.start_date if income.start_date else "" }}</td>
+        <td>{{income.end_date if income.end_date else ""}}</td>
+        <th>{{income.account.title}}</th>
+    </tr>
+    {% endfor %}
+</table>
+{% else %} {% endif %} {% endblock %}

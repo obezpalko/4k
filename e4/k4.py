@@ -13,7 +13,7 @@ from sqlalchemy import func, and_, select
 from .oauth import GOOGLE, REDIRECT_URI, get_user_info
 from .database import DB_URL, DB_SESSION, User, \
     UserCurrencies, Currency, Account, Rate, Transaction, \
-    DBJsonEncoder
+    DBJsonEncoder, Income, Interval
 from .utils import strip_numbers
 
 __version__ = "1.0.1"
@@ -99,6 +99,19 @@ def logout():
     """ log user out and clear session """
     session.pop('user', '')
     return redirect(url_for('index'))  # , _external=True, _scheme='https'))
+
+@APP.route('/incomes')
+def incomes():
+    """ show incomes page """
+    if 'user' not in session:
+        return redirect(url_for('index'))
+    return render_template(
+        "incomes.html",
+        incomes=DB.query(Income).filter(
+            Income.user_id == session['user'][0]
+            ).order_by(Income.start_date, Income.title).all(),
+        user=DB.query(User).get(session['user'][0])
+    )
 
 
 @APP.route('/accounts')
@@ -294,6 +307,34 @@ def account_delete(**kwargs):
     DB.commit()
     return {'deleted': kwargs['id']}
 
+
+def income_get(**kwargs):
+    ''' incomes api '''
+    if kwargs['id'] == 0:
+        return {
+            "id": 0,
+            "title": "",
+            "currency": {"id": 1},
+            "summ": 0.00,
+            "start_date": date.today().isoformat(),
+            "period":  {"id": 4},
+            "user_id": session['user'][0],
+            "account_id": None,
+            "is_credit": False
+        }
+    return DB.query(Income).filter(
+        and_(
+            Income.record_id == kwargs['id'],
+            Income.user_id == session['user'][0]
+        )).first()
+
+def period_get(**kwargs):
+    ''' period api '''
+    if kwargs['id'] != 0:
+        return DB.query(Interval).filter(
+            Interval.record_id == kwargs['id']
+            ).first()
+    return DB.query(Interval).all()
 
 @APP.route(
     '/api/<string:api>',

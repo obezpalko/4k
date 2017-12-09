@@ -88,7 +88,6 @@ class Interval(__base__):  # pylint: disable=R0903
         }
 
 
-
 class Rate(__base__):  # pylint: disable=R0903
     """
     currenciess and rates
@@ -152,7 +151,7 @@ class Currency(__base__):
             'id':       self.record_id,
             'title':    self.title,
             'name':     self.name,
-            'rate':     self.get
+            'rate':     self.rate
             }
 
 
@@ -179,16 +178,19 @@ class Income(__base__):
 
     __tablename__ = 'incomes'
     record_id = Column(Integer, primary_key=True, name='id')
-    title = Column(String)
-    currency_id = Column(Integer, ForeignKey('currency.id'))
+    title = Column(String, nullable=False)
+    currency_id = Column(Integer, ForeignKey('currency.id'), nullable=False)
     currency = relationship('Currency')
-    summ = Column(Numeric(12, 2))
-    start_date = Column(Date)
+    summ = Column(Numeric(12, 2), nullable=False)
+    start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
-    period_id = Column(Integer, ForeignKey('intervals.id'))
+    period_id = Column(Integer, ForeignKey('intervals.id'), nullable=False)
     period = relationship('Interval')
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     user = relationship('User')
+    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=True)
+    account = relationship('Account')
+    is_credit = Column(Boolean, default=False)
 
     def __repr__(self):
         return "{:20s} {}".format(self.title, self.currency)
@@ -203,7 +205,9 @@ class Income(__base__):
             'summ':         "{:.2f}".format(self.summ),
             'start_date':   self.start_date.isoformat(),
             'end_date':     (None if self.end_date is None else self.end_date.isoformat()),
-            'period':       self.period
+            'period':       self.period,
+            'account':      self.account,
+            'is_credit':    self.is_credit
         }
 
     def get_backlog(self, max_date):
@@ -379,16 +383,19 @@ class Transaction(__base__):  # pylint: disable=R0903
 
 
 class Payforward(__base__):  # pylint: disable=R0903
-    """table of regular payments which was payed before described date
+    """table of regular payments which was payed before described date.
+    to manage payments
+    also used as indicator of credits
 
     """
 
     __tablename__ = 'payforwards'
     record_id = Column(Integer, primary_key=True, name='id')
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
     income = relationship('Income')
     income_date = Column(Date, nullable=False)
-    payment_date = Column(Date, nullable=False)
+    # payment_date = Column(Date, nullable=False)
     transaction_id = Column(Integer, ForeignKey(
         'transactions.id'), nullable=False)
     transaction = relationship('Transaction')
