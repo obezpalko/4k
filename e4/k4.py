@@ -16,9 +16,8 @@ from .database import User, \
     DBJsonEncoder, Income, Interval
 from .base import DB_URL, DB_SESSION
 from .utils import strip_numbers
-from .transactions import Transaction, \
-    transaction_get
-from .payforward import Payforward
+from .transactions import Transaction, transaction_get  # pylint: disable=W0611
+#  from .payforward import Payforward
 
 __version__ = "1.0.1"
 
@@ -122,7 +121,7 @@ def incomes():
     )
 
 
-def active_accounts_get(**kwargs): # pylint: disable=C0111
+def active_accounts_get(**kwargs): # pylint: disable=C0111,W0613
     return DB.query(Account).filter(
         and_(
             Account.user_id == session['user'][0],
@@ -397,10 +396,15 @@ def income_post(**kwargs):
 def income_delete(**kwargs):
     ''' mark income as deleted if there are transactions '''
     income = DB.query(Income).get(kwargs['id'])
-    # TODO: check and delete if all transactions are in future. perhaps, just delete all the transactions
-    if DB.query(Transaction).filter(Transaction.income_id == kwargs['id']).count() > 0:
+    if DB.query(Transaction).filter(
+            and_(
+                Transaction.income_id == kwargs['id'],
+                Transaction.time <= date.today()
+            )
+        ).count() > 0:
         income.deleted = True
     else:
+        DB.query(Transaction).filter(Transaction.income_id == kwargs['id']).delete()
         DB.query(Income).filter(Income.record_id == kwargs['id']).delete()
     DB.commit()
     return {'deleted': kwargs['id']}
