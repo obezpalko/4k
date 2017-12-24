@@ -6,23 +6,17 @@ database and tables
 import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-from sqlalchemy import and_, func, create_engine, select, \
+from sqlalchemy import and_, func, select, \
     PrimaryKeyConstraint, Column, DateTime, Date, String, Integer, Enum, \
-    Text, ForeignKey, Numeric, Boolean, CHAR
-from sqlalchemy.orm import scoped_session, relationship, sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+    ForeignKey, Numeric, Boolean, CHAR
+from sqlalchemy.orm import relationship
 from .utils import next_date
+from .transactions import Transaction
+from .base import __base__, DB_SESSION, __engine__
+from .payforward import Payforward
 
 
-DB_URL = "postgresql://e4:og8ozJoch\\Olt6@localhost:5432/e4"
 
-
-__engine__ = create_engine(DB_URL)
-DB_SESSION = scoped_session(sessionmaker(autocommit=False,
-                                         autoflush=False,
-                                         bind=__engine__))
-__base__ = declarative_base()
-__base__.query = DB_SESSION.query_property()
 
 class DBJsonEncoder(json.JSONEncoder):  # pylint: disable=C0111
     def default(self, obj):  # pylint: disable=E0202,W0221
@@ -345,61 +339,6 @@ class Account(__base__):
     def __repr__(self):
         return "{:10s}".format(self.title)
 
-class Transaction(__base__):  # pylint: disable=R0903
-    """transactions
-
-    list of transactions
-    """
-
-    __tablename__ = 'transactions'
-    record_id = Column(Integer, primary_key=True, name='id')
-    time = Column(Date, nullable=False)
-    account_id = Column(Integer, ForeignKey('accounts.id'))
-    account = relationship("Account")
-    user_id = Column(Integer, ForeignKey('users.id'))
-    user = relationship('User')
-    summ = Column(Numeric(12, 2), nullable=False)
-    transfer = Column(Integer, ForeignKey('transactions.id'),
-                      nullable=True)  # id of exchange/transfer operation
-    income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
-    income = relationship("Income")  # , back_populates='transactions')
-    comments = Column(Text)
-
-    @property
-    def json(self):  # pylint: disable=C0111
-        """convert object to dict/json"""
-        return {
-            "id":       self.record_id,
-            "time":     self.time.isoformat(),
-            "account":  self.account,
-            "summ":     "{:.2f}".format(self.summ),
-            "transfer": self.transfer,
-            "income":   self.income,
-            "comment":  self.comment
-        }
-
-    def __repr__(self):
-        return "{:6d} {} {} {} {} {}".format(self.record_id, self.time, self.account,
-                                             self.summ, self.transfer, self.income)
-
-
-class Payforward(__base__):  # pylint: disable=R0903
-    """table of regular payments which was payed before described date.
-    to manage payments
-    also used as indicator of credits
-
-    """
-
-    __tablename__ = 'payforwards'
-    record_id = Column(Integer, primary_key=True, name='id')
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    income_id = Column(Integer, ForeignKey('incomes.id'), nullable=True)
-    income = relationship('Income')
-    income_date = Column(Date, nullable=False)
-    # payment_date = Column(Date, nullable=False)
-    transaction_id = Column(Integer, ForeignKey(
-        'transactions.id'), nullable=False)
-    transaction = relationship('Transaction')
 
 
 

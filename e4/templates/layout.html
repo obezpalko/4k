@@ -46,8 +46,14 @@
             <div class=profile>
                 <a href="{{ user.link }}"><img alt="{{ user.name }}" src="{{ user.picture }}" width="64px"></a>
             </div>
-            <div>{{ session.user[0] }} {{user.user_id}}</div>
-            <div class=balance>balance</div>
+
+            <div class=balance>
+                <ul>
+                    {% for account in active_accounts %}
+                    <li>{{ account.title }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
             {% endif %}
         </div>
 

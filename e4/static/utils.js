@@ -58,7 +58,7 @@ function loadPeriods(url) {
     var r = "";
     $.ajax({
         dataType: "json",
-        url: url,
+        url,
         success(data) {
             $.each(data, function(key, val) {
                 r += "<option value='" + val.id + "'>" + val.title +

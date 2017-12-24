@@ -11,10 +11,14 @@ from flask import Flask, request, url_for, redirect, session, \
 from flask_sqlalchemy_session import flask_scoped_session
 from sqlalchemy import func, and_, select
 from .oauth import GOOGLE, REDIRECT_URI, get_user_info
-from .database import DB_URL, DB_SESSION, User, \
-    UserCurrencies, Currency, Account, Rate, Transaction, \
+from .database import User, \
+    UserCurrencies, Currency, Account, Rate, \
     DBJsonEncoder, Income, Interval
+from .base import DB_URL, DB_SESSION
 from .utils import strip_numbers
+from .transactions import Transaction, \
+    transaction_get
+from .payforward import Payforward
 
 __version__ = "1.0.1"
 
@@ -113,9 +117,18 @@ def incomes():
                 Income.deleted != True
             )
             ).order_by(Income.start_date, Income.title).all(),
-        user=DB.query(User).get(session['user'][0])
+        user=DB.query(User).get(session['user'][0]),
+        active_accounts=active_accounts_get()
     )
 
+
+def active_accounts_get(**kwargs): # pylint: disable=C0111
+    return DB.query(Account).filter(
+        and_(
+            Account.user_id == session['user'][0],
+            Account.deleted != True,
+            Account.visible)
+        ).order_by(Account.title, Account.currency_id).all()
 
 @APP.route('/accounts')
 def accounts():
@@ -130,7 +143,8 @@ def accounts():
                 Account.deleted != True
             )
             ).order_by(Account.title, Account.currency_id).all(),
-        user=DB.query(User).get(session['user'][0])
+        user=DB.query(User).get(session['user'][0]),
+        active_accounts=active_accounts_get()
     )
 
 
@@ -147,7 +161,8 @@ def currency():
     return render_template(
         "currency.html",
         currencies=currencies,
-        user=DB.query(User).get(session['user'][0])
+        user=DB.query(User).get(session['user'][0]),
+        active_accounts=active_accounts_get()
     )
 
 
@@ -333,6 +348,7 @@ def income_get(**kwargs):
             Income.user_id == session['user'][0]
         )).first()
 
+
 def income_put(**kwargs):  # pylint: disable=W0613
     ''' add income '''
     obj = json.loads(request.data.decode('utf-8', 'strict'))
@@ -389,6 +405,7 @@ def income_delete(**kwargs):
     DB.commit()
     return {'deleted': kwargs['id']}
 
+
 def period_get(**kwargs):
     ''' period api '''
     if kwargs['id'] != 0:
@@ -408,7 +425,7 @@ def main_dispatcher(**kwargs):
     """ main dispatcher """
     if 'user' not in session:
         return '{"access": "denied"}'
-
+    kwargs['args'] = request.args
     return Response(
         response=json.dumps(
             globals()["{}_{}".format(
