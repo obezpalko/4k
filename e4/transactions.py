@@ -5,7 +5,7 @@ import datetime
 import decimal
 import json
 from sqlalchemy import Column, Date, Integer, Text, ForeignKey, Numeric, \
-    desc
+    desc, asc, and_
 from sqlalchemy.orm import relationship
 from flask import request
 from .base import __base__, DB_SESSION as DB
@@ -53,13 +53,30 @@ class Transaction(__base__):  # pylint: disable=R0903
 
 def transaction_get(**kwargs): # pylint: disable=C0111
     if kwargs['id'] == 0:
-        _start = int(kwargs['args']['start']) if 'start' in kwargs['args'] else 0
-        _limit = int(kwargs['args']['limit']) if 'limit' in kwargs['args'] else 100
-        return DB.query(Transaction).order_by(
-            desc(Transaction.time)).filter(Transaction.record_id >= _start).limit(_limit).from_self().order_by(
-                Transaction.time).all()
-    return DB.query(Transaction).order_by(
-        desc(Transaction.time)).get(kwargs['id'])
+        from .accounts import Account
+        from .currencies import Currency
+        _limit = int(kwargs['args'].getlist('limit')[0]) if kwargs['args'].getlist('limit') else 100
+        _start = int(kwargs['args'].getlist('start')[0]) if kwargs['args'].getlist('start') else 0
+        filter_ = Transaction.record_id >= _start
+        if request.args.getlist('account'):
+            filter_ = and_(
+                filter_,
+                Transaction.account_id.in_(request.args.getlist('account'))
+            )
+        else:
+            if request.args.getlist('currency'):
+                filter_ = and_(
+                    filter_,
+                    Currency.title.in_(request.args.getlist('currency'))
+                )
+
+        return  DB.query(Transaction).join(Account).join(Currency).filter(
+            filter_
+            ).order_by(
+                asc(Transaction.record_id)
+                ).limit(_limit).all()
+
+    return DB.query(Transaction).order_by(desc(Transaction.time)).get(kwargs['id'])
 
 def transactions_delete(**kwargs): # pylint: disable=C0111
     income = DB.query(Transaction).filter_by(record_id=kwargs['id']).delete()

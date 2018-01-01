@@ -1,0 +1,58 @@
+{% extends "layout.html" %} {% if session.user %} {% block js %}
+<script>
+</script>
+{% endblock %} {% endif %} {% block body %} {% if session.user %}
+
+<form action="{{ url_for('main_dispatcher', api='transaction') }}" method=post class="add-entry hidden" id="accounts">
+    <dl>
+        <dt>ID</dt>
+        <dd><input type=text name=id class=id value="" size=4 disabled></dd>
+        <dt>Title</dt>
+        <dd><input type=text size=25 name=title class=form_save value=""></dd>
+        <dt>Currency</dt>
+        <dd><select name=currency.id class="currency currency_selector currency_picker"></select></dd>
+        <dt>Visible</dt>
+        <dd><input type="checkbox" name=visible class=form_save>
+        </dd>
+        <dt>Summ</dt>
+        <dd><input name=balance class=form_save size=10></dd>
+    </dl>
+</form>
+
+<table>
+    <tr>
+        <th>id <a href='#0' class="account_edit">+</a></th>
+        <th>time</th>
+        <th>summ</th>
+        <th>currency</th>
+        <th>account</th>
+        <th>comments</th>
+
+
+    </tr>
+    {% for transaction in transactions %}
+    <tr>
+        <td>
+            {{ transaction.record_id }}
+        </td>
+        <td>
+            {{ transaction.time }}
+        </td>
+        <td>
+            {{ transaction.summ }}
+        </td>
+
+        <td>
+            {{ transaction.account.currency }}
+        </td>
+
+        <td>
+            {{ transaction.account.title }}
+        </td>
+        <td>
+            {{ transaction.comments }}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %} {% endif %} {% endblock %}
