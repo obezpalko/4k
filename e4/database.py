@@ -7,15 +7,15 @@ import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from sqlalchemy import and_, func, select, \
-    PrimaryKeyConstraint, Column, DateTime, Date, String, Integer, Enum, \
-    ForeignKey, Numeric, Boolean, CHAR
+    Column, Date, String, Integer, Enum, \
+    ForeignKey, Numeric, Boolean
 from sqlalchemy.orm import relationship
 from .utils import next_date
 from .transactions import Transaction
 from .base import __base__, DB_SESSION, __engine__
 from .payforward import Payforward
-
-
+from .accounts import Account
+from .currencies import Currency, Rate
 
 
 class DBJsonEncoder(json.JSONEncoder):  # pylint: disable=C0111
@@ -82,86 +82,6 @@ class Interval(__base__):  # pylint: disable=R0903
         }
 
 
-class Rate(__base__):  # pylint: disable=R0903
-    """
-    currenciess and rates
-    """
-    __tablename__ = 'rates'
-    __table_args__ = (
-        PrimaryKeyConstraint(
-            'rate_date', 'currency_a_id', 'currency_b_id', 'rate'
-        ),
-    )
-    #  record_id = Column(Integer, primary_key=True, name='id')
-    rate_date = Column(DateTime)
-    currency_a_id = Column(Integer, ForeignKey('currency.id'))
-    currency_b_id = Column(Integer, ForeignKey('currency.id'))
-    currency_a = relationship(
-        "Currency", primaryjoin='currency.c.id==rates.c.currency_a_id')
-    currency_b = relationship(
-        "Currency", primaryjoin='currency.c.id==rates.c.currency_b_id')
-    rate = Column(Numeric(15, 4), nullable=False)
-
-    def __repr__(self):
-        return "{}={:.4f}*{}".format(
-            self.currency_b, self.rate, self.currency_a
-        )
-    @property
-    def json(self):  # pylint: disable=C0111
-        """convert object to dict/json"""
-        return {
-            "id": self.currency_b_id,
-            "title": self.currency_b.title,
-            "symbol": self.currency_b.symbol,
-            "rate": self.rate,
-            "rate_date": self.rate_date.date().isoformat()
-        }
-
-
-class Currency(__base__):
-    """
-    currencies definitions
-    """
-    __tablename__ = 'currency'
-    record_id = Column(Integer, primary_key=True, name='id')
-    title = Column(String)
-    name = Column(String)
-    symbol = Column(CHAR)
-    rate_rel = relationship("Rate", foreign_keys=[Rate.currency_b_id])
-
-    @property
-    def rate(self):
-        """return current rate"""
-        return DB_SESSION.query(Rate).filter(Rate.currency_b_id == self.record_id).order_by(
-            Rate.rate_date.desc()).first()
-
-    def __repr__(self):
-        return "{}".format(self.title)
-
-    @property
-    def json(self): # pylint: disable=C0111
-        """convert object to dict/json"""
-        return {
-            'id':       self.record_id,
-            'title':    self.title,
-            'name':     self.name,
-            'rate':     self.rate
-            }
-
-
-class UserCurrencies(__base__):  # pylint: disable=R0903
-    """ link users to currencies
-    """
-
-    __tablename__ = 'user_currencies'
-    __table_args__ = (
-        PrimaryKeyConstraint('user_id', 'currency_id'),
-    )
-    user_id = Column(Integer, ForeignKey('users.id'))
-    user = relationship('User')
-    currency_id = Column(Integer, ForeignKey('currency.id'))
-    currency = relationship('Currency')
-    default = Column(Boolean, default=False, nullable=False)
 
 
 class Income(__base__):
@@ -280,64 +200,6 @@ class Income(__base__):
         except IndexError:
             return 0
 
-
-class Account(__base__):
-    """
-    accounts
-    """
-    __tablename__ = 'accounts'
-    record_id = Column(Integer, primary_key=True, name='id')
-    title = Column(String)
-    currency_id = Column(Integer, ForeignKey('currency.id'))
-    currency = relationship('Currency')
-    user_id = Column(Integer, ForeignKey('users.id'))
-    user = relationship('User')
-    transactions = relationship('Transaction', cascade="all, delete-orphan")
-    deleted = Column(Boolean, default=False)
-    visible = Column(Boolean, default=True)
-
-    @property
-    def json(self):  # pylint: disable=C0111
-        """convert object to dict/json"""
-        return {
-            'id': self.record_id,
-            'title': self.title,
-            'currency': self.currency,
-            'balance': "{:.2f}".format(self.balance()),
-            'visible': self.visible,
-            'deleted': self.deleted
-        }
-
-    def fix_balance(self, n_balance, n_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):   # pylint: disable=C0111
-        delta = n_balance - self.balance(n_date)
-        if delta == 0:
-            return 0
-        transaction = Transaction(
-            time=n_date, summ=delta,
-            account_id=self.record_id, user_id=self.user_id,
-            comment='fix account summ'
-            )
-        DB_SESSION.add(transaction)
-        return transaction.record_id
-
-
-    def balance(self, end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):   # pylint: disable=C0111
-        result = DB_SESSION.query(
-            Transaction.account_id,
-            func.sum(Transaction.summ).label('total')
-        ).filter(
-            and_(
-                Transaction.account_id == self.record_id,
-                Transaction.time <= end_date
-            )
-        ).group_by(Transaction.account_id).first()
-        if result:
-            return result[1]
-        return Decimal(0.0)
-
-
-    def __repr__(self):
-        return "{:10s}".format(self.title)
 
 
 

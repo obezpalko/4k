@@ -9,11 +9,13 @@ from flask import Flask, request, url_for, redirect, session, \
     render_template, Response
 # from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy_session import flask_scoped_session
-from sqlalchemy import func, and_, select
+from sqlalchemy import and_
 from .oauth import GOOGLE, REDIRECT_URI, get_user_info
 from .database import User, \
-    UserCurrencies, Currency, Account, Rate, \
+    Account, \
     DBJsonEncoder, Income, Interval
+from .currencies import UserCurrencies, Currency
+from .currencies import usercurrency_delete, usercurrency_put, currency_get  # pylint: disable=W0611
 from .base import DB_URL, DB_SESSION
 from .utils import strip_numbers
 from .transactions import Transaction, transaction_get  # pylint: disable=W0611
@@ -165,92 +167,18 @@ def currency():
     )
 
 
-def currency_get(**kwargs):
-    '''
-    get list of currency rates
-    '''
-    max_date_q = select([
-        Rate.currency_b_id.label("b_id"),
-        func.max(Rate.rate_date).label("rate_date")]).group_by(
-            Rate.currency_b_id).alias('max_date_q')
-    rates_query = DB.query(
-        Rate.currency_b_id, Rate, Rate.rate_date
-    ).join(
-        max_date_q,
-        and_(
-            max_date_q.c.b_id == Rate.currency_b_id,
-            max_date_q.c.rate_date == Rate.rate_date
-        )
+@APP.route('/transactions')
+def transaction():
+    '''show transactions log'''
+    if 'user' not in session:
+        return redirect(url_for('index'))
+
+    return render_template(
+        'transactions.html',
+        user=DB.query(User).get(session['user'][0]),
+        transactions=transaction_get(id=0, args=request.args)
     )
 
-    entries = []
-    if 'id' in kwargs and kwargs['id']:
-        try:
-            return rates_query.filter(
-                Rate.currency_b_id == kwargs['id']).first()[1].json
-        except TypeError:
-            return []
-    else:
-        for rate in rates_query.all():
-            entries.append(rate[1].json)
-    return entries
-
-
-def usercurrency_put(**kwargs):
-    """ update user currencies
-
-    Arguments:
-        **kwargs id -- currency id
-
-    Returns:
-        json -- result code
-    """
-
-    obj = json.loads(request.data.decode('utf-8', 'strict'))
-    updated = 0
-
-    if 'default' in obj and obj['default']:
-        # clean previous default
-        updated = DB.query(UserCurrencies).filter(
-            and_(
-                UserCurrencies.user_id == session['user'][0],
-                UserCurrencies.currency_id != kwargs['id'])
-            ).update(
-                {UserCurrencies.default: False},
-                synchronize_session='evaluate')
-        updated = DB.query(UserCurrencies).filter(
-            and_(
-                UserCurrencies.user_id == session['user'][0],
-                UserCurrencies.currency_id == kwargs['id']
-                )
-            ).update(
-                {UserCurrencies.default: True},
-                synchronize_session='evaluate')
-        if updated == 0:
-            # if not updated nothing - inser new record
-            DB.add(UserCurrencies(
-                user_id=session['user'][0],
-                currency_id=kwargs['id'],
-                default=True
-                ))
-    else:
-        DB.add(UserCurrencies(
-            user_id=session['user'][0],
-            currency_id=kwargs['id']
-            ))
-    DB.commit()
-    return {'result': 'Ok'}
-
-
-def usercurrency_delete(**kwargs):
-    ''' delete user currency '''
-    DB.query(UserCurrencies).filter(
-        and_(
-            UserCurrencies.user_id == session['user'][0],
-            UserCurrencies.currency_id == kwargs['id'])
-        ).delete(synchronize_session=False)
-    DB.commit()
-    return {'result': 'Ok'}
 
 
 def account_post(**kwargs):
@@ -268,11 +196,11 @@ def account_post(**kwargs):
         delta_summ = Decimal(strip_numbers(obj['balance'])) - account.balance()
         if delta_summ != 0:
             print('summ update required')
-            transaction = Transaction(
+            transaction_ = Transaction(
                 time=date.today(), summ=delta_summ,
                 account_id=kwargs['id'], user_id=session['user'][0],
                 comment='fix account summ')
-            DB.add(transaction)
+            DB.add(transaction_)
     DB.commit()
     return {'result': 'Ok'}
 
