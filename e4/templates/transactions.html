@@ -23,10 +23,10 @@
     <tr>
         <th>id <a href='#0' class="account_edit">+</a></th>
         <th>time</th>
-        <th>summ</th>
-        <th>currency</th>
+        <th colspan=2>summ</th>
         <th>account</th>
         <th>comments</th>
+        <th>transfer</th>
 
 
     </tr>
@@ -38,12 +38,12 @@
         <td>
             {{ transaction.time }}
         </td>
-        <td>
+        <td style="text-align: right">
             {{ transaction.summ }}
         </td>
 
         <td>
-            {{ transaction.account.currency }}
+            {{ transaction.account.currency.symbol }}
         </td>
 
         <td>
@@ -51,6 +51,9 @@
         </td>
         <td>
             {{ transaction.comments }}
+        </td>
+        <td>
+            {{ transaction.transfer }}
         </td>
     </tr>
     {% endfor %}

@@ -5,7 +5,7 @@ import datetime
 import decimal
 import json
 from sqlalchemy import Column, Date, Integer, Text, ForeignKey, Numeric, \
-    desc, asc, and_
+    desc, asc, and_, or_
 from sqlalchemy.orm import relationship
 from flask import request
 from .base import __base__, DB_SESSION as DB
@@ -52,26 +52,47 @@ class Transaction(__base__):  # pylint: disable=R0903
                                              self.summ, self.transfer, self.income)
 
 def transaction_get(**kwargs): # pylint: disable=C0111
+    print(kwargs)
     if kwargs['id'] == 0:
         from .accounts import Account
         from .currencies import Currency
         _limit = int(kwargs['args'].getlist('limit')[0]) if kwargs['args'].getlist('limit') else 100
         _start = int(kwargs['args'].getlist('start')[0]) if kwargs['args'].getlist('start') else 0
-        filter_ = Transaction.record_id >= _start
+        _filter = Transaction.record_id >= _start
         if request.args.getlist('account'):
-            filter_ = and_(
-                filter_,
+            _filter = and_(
+                _filter,
                 Transaction.account_id.in_(request.args.getlist('account'))
             )
         else:
             if request.args.getlist('currency'):
-                filter_ = and_(
-                    filter_,
+                _filter = and_(
+                    _filter,
                     Currency.title.in_(request.args.getlist('currency'))
                 )
+        if request.args.getlist('date'):
+            _start_date = request.args.getlist('date')[0]
+            if _start_date[0] == '=':
+                _start_date = _start_date[1:]
+                _filter = and_(_filter, Transaction.time == _start_date)
+            else:
+                _filter = and_(_filter, Transaction.time >= _start_date)
+            _end_date = request.args.getlist('date')[-1]
+            if _end_date != _start_date:
+                _filter = and_(_filter, Transaction.time <= _end_date)
+        if request.args.getlist('transfer'):
+            _filter = and_(_filter, Transaction.transfer != None)
+        _filter_comments = None
+        for _match in request.args.getlist('filter'):
+            if _filter_comments is None:
+                _filter_comments = Transaction.comments.op('~')(_match)
+            _filter_comments = or_(_filter_comments, Transaction.comments.op('~*')(_match))
+        if _filter_comments is not None:
+            _filter = and_(_filter, _filter_comments)
+        print(_filter)
 
         return  DB.query(Transaction).join(Account).join(Currency).filter(
-            filter_
+            _filter
             ).order_by(
                 asc(Transaction.record_id)
                 ).limit(_limit).all()
