@@ -3,6 +3,8 @@
 income class
 """
 from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
+
 try:
     from .utils import next_date
 except ImportError:
@@ -167,10 +169,11 @@ class Income(Base):
             'period': self.period
         }
 
-    def get_backlog(self, max_date=date.today().replace(
-        month=(date.today().month + 1) % 12,
-        year=date.today().year if date.today().month < 12 else  date.today().year + 1
-        )):
+    def get_backlog(self, max_date=None):
+
+        if max_date is None:
+            max_date = date.today() + relativedelta(months=1)
+
         backlog = []
 
         (last_payment,) = DB.query(func.max(Transaction.time)).filter(

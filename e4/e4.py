@@ -117,7 +117,10 @@ def update_rates():
                                 rate=match.group('rate')))
 
         else:
-            print("cannot get rate {}:{}".format(currency, default_currency))
+            print("cannot get rate {}:{} ({})".format(
+                currency,
+                default_currency,
+                _request.status))
 
     DB.bulk_save_objects(objects)
     DB.commit()
