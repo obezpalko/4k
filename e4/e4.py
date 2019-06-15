@@ -10,31 +10,35 @@ import decimal
 from flask import Flask, request, session, redirect, url_for, \
     render_template, flash, send_file
 
-#  from flask_login import UserMixin, login_required, login_user, logout_user, current_user
+#  from flask_login import UserMixin, login_required, login_user, logout_user, \
+#      current_user
 from flask_oauth import OAuth
 # from flask_sqlalchemy import SQLAlchemy
 from urllib3 import PoolManager
 import certifi
 from sqlalchemy import func, and_, or_, desc, select
-from .utils import number_of_weeks, strip_numbers
-from .database import Currency, Rate, Income, Interval, Transaction, Account, Payforward
-from .base import DB_SESSION as DB, DB_URL
+from utils import number_of_weeks, strip_numbers
+from database import Currency, Rate, Income, Interval, Transaction, Account, \
+        Payforward
+from base import DB_SESSION as DB, DB_URL
 # from .income import DB, Currency, Rate, Income, Interval, Transaction, \
 #     Account, Payforward
 #  from .plot import plot_weekly_plan
 
 __version__ = "0.4"
-
 RE_C_EXCHANGE = re.compile(
-    r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
+    r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = '
+    '<span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
 
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
 
-GOOGLE_CLIENT_ID = '571919489560-p5itd3kcf1ileur7ih5bn07kc51ur21p.apps.googleusercontent.com'
+GOOGLE_CLIENT_ID = '571919489560-p5itd3kcf1ileur7ih5bn07kc51ur21p' + \
+    '.apps.googleusercontent.com'
 GOOGLE_CLIENT_SECRET = 'ji3-Qsfziyj6ya0IdXUd6sGT'
-REDIRECT_URI = '/oauth2callback'  # one of the Redirect URIs from Google APIs console
+# one of the Redirect URIs from Google APIs console
+REDIRECT_URI = '/oauth2callback'
 
 oauth = OAuth()
 
@@ -43,8 +47,9 @@ google = oauth.remote_app(
     base_url='https://www.google.com/accounts/',
     authorize_url='https://accounts.google.com/o/oauth2/auth',
     request_token_url=None,
-    request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
-                          'response_type': 'code'},
+    request_token_params={
+        'scope': 'https://www.googleapis.com/auth/userinfo.email',
+        'response_type': 'code'},
     access_token_url='https://accounts.google.com/o/oauth2/token',
     access_token_method='POST',
     access_token_params={'grant_type': 'authorization_code'},
@@ -54,16 +59,16 @@ google = oauth.remote_app(
 #
 # Load default config and override config from an environment variable
 app.config.update(dict(
-    DATABASE=os.path.join(app.root_path, 'e4.db'),
-    SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
-    USERNAME='admin',
-    PASSWORD='NieniarcEgHiacHeulijkikej',
-    HORIZON='12m',
-    PREFERRED_URL_SCHEME='https',
-    SESSION_TYPE = 'sqlalchemy',
-    SQLALCHEMY_DATABASE_URI = DB_URL,
-    SQLALCHEMY_TRACK_MODIFICATIONS = False,
-    DEBUG=True
+ DATABASE=os.path.join(app.root_path, 'e4.db'),
+ SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
+ USERNAME='admin',
+ PASSWORD='NieniarcEgHiacHeulijkikej',
+ HORIZON='12m',
+ PREFERRED_URL_SCHEME='https',
+ SESSION_TYPE='sqlalchemy',
+ SQLALCHEMY_DATABASE_URI=DB_URL,
+ SQLALCHEMY_TRACK_MODIFICATIONS=False,
+ DEBUG=True
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
 
@@ -73,12 +78,13 @@ def json_serial(obj):
 
     if isinstance(obj, (datetime.datetime, datetime.date)):
         return obj.isoformat()
-    if isinstance(obj, (Currency, Income, Rate, Interval, Transaction, Account)):
+    if isinstance(obj, (Currency, Income, Rate, Transaction)):
+        return obj.to_dict()
+    if isinstance(obj, (Interval, Account)):
         return obj.to_dict()
     if isinstance(obj, decimal.Decimal):
         return format(obj.__str__())
     raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
-
 
 
 @app.teardown_request
@@ -86,6 +92,7 @@ def session_clear(exception=None):
     #  Session.remove()
     if exception:
         DB.rollback()
+
 
 @app.cli.command('rates')
 @app.route('/update_rates')
@@ -100,7 +107,8 @@ def update_rates():
         c_title[currency.title] = currency.record_id
         _request = http.request(
             'GET',
-            "https://finance.google.com/finance/converter?a=1&from={}&to={}".format(
+            "https://finance.google.com/finance/converter"
+            "?a=1&from={}&to={}".format(
                 currency, default_currency))
         if _request.status == 200:
             for line in _request.data.decode('utf-8', 'replace').split('\n'):
@@ -112,10 +120,10 @@ def update_rates():
                                                 match.group('rate')))
                         objects.append(
                             Rate(
-                                rate_date=datetime.datetime.now(),
-                                currency_a_id=default_currency.record_id,
-                                currency_b_id=c_title[match.group('currency_b')],
-                                rate=match.group('rate')))
+                              rate_date=datetime.datetime.now(),
+                              currency_a_id=default_currency.record_id,
+                              currency_b_id=c_title[match.group('currency_b')],
+                              rate=match.group('rate')))
 
         else:
             print("cannot get rate {}:{}".format(currency, default_currency))
@@ -124,7 +132,11 @@ def update_rates():
     DB.commit()
     try:
         if request.method == 'GET':
-            return redirect(url_for('dispatcher', api='currency', _external=True, _scheme='https'))
+            return redirect(url_for(
+                'dispatcher',
+                api='currency',
+                _external=True,
+                _scheme='https'))
         return True
     except (RuntimeError, AttributeError):
         return True
@@ -142,23 +154,28 @@ def show_incomes():
     access_token = access_token[0]
     _http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
     headers = {'Authorization': 'OAuth '+access_token}
-    _request = _http.request('GET', 'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
+    _request = _http.request(
+            'GET',
+            'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
     if _request.status == 401:
         session.pop('access_token', None)
         return redirect(url_for('login'))
     userinfo = json.loads(_request.data.decode('utf-8', 'strict'))
-    if not (userinfo['email'] in ['alex@bezpalko.mobi', 'obezpalko@gmail.com']):
+    if not userinfo['email'] in ['alex@bezpalko.mobi', 'obezpalko@gmail.com']:
         session.pop('access_token', None)
         return redirect(url_for('login'))
     else:
         session['email'] = userinfo['email']
         session['logged_in'] = True
 
-    return render_template('show_entries.html',
-                           entries=list(map(lambda x: x.to_dict(), incomes_get(id=0))),
-                           currencies=currency_get(id=0),
-                           periods=intervals_get(id=0),
-                           transactions=list(map(lambda x: x.to_dict(), transactions_get(id=0))))
+    return render_template(
+            'show_entries.html',
+            entries=list(
+                map(lambda x: x.to_dict(), incomes_get(id=0))),
+            currencies=currency_get(id=0),
+            periods=intervals_get(id=0),
+            transactions=list(
+                map(lambda x: x.to_dict(), transactions_get(id=0))))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -200,21 +217,22 @@ def currency_get(**kwargs):
     max_date_q = select([
             Rate.currency_b_id.label("b_id"),
             func.max(Rate.rate_date).label("rate_date")
-    ]).group_by( Rate.currency_b_id ).alias('max_date_q')
+    ]).group_by(Rate.currency_b_id).alias('max_date_q')
     rates_query = DB.query(
         Rate.currency_b_id, Rate, Rate.rate_date
     ).join(
         max_date_q,
         and_(
-            max_date_q.c.b_id==Rate.currency_b_id,
-            max_date_q.c.rate_date==Rate.rate_date
+            max_date_q.c.b_id == Rate.currency_b_id,
+            max_date_q.c.rate_date == Rate.rate_date
         )
     )
 
     entries = []
     if 'id' in kwargs and kwargs['id']:
         try:
-            return rates_query.filter(Rate.currency_b_id==kwargs['id']).first()[1].to_dict()
+            return rates_query.filter(
+                    Rate.currency_b_id == kwargs['id']).first()[1].to_dict()
         except TypeError:
             return []
     else:
@@ -230,21 +248,24 @@ def incomes_delete(**kwargs):
 
 
 def incomes_get(**kwargs):
-    return DB.query(Income).all() if kwargs['id'] == 0 else DB.query(Income).get(kwargs['id'])
+    if kwargs['id'] == 0:
+        return DB.query(Income).all()
+    else:
+        return DB.query(Income).get(kwargs['id'])
 
 
 def incomes_post(**kwargs):
     obj = json.loads(request.data.decode('utf-8', 'strict'))
     # try:
     i = Income(
-        title=obj['title'],
-        currency_id=int(obj['currency.id']),
-        sum=decimal.Decimal(strip_numbers(obj['sum'])),
-        start_date=datetime.datetime.strptime(
-            obj['start_date'], '%Y-%m-%d').date(),
-        end_date=(None if obj['end_date'] == '' else datetime.datetime.strptime(
-            obj['end_date'], '%Y-%m-%d').date()),
-        period_id=int(obj['period.id'])
+      title=obj['title'],
+      currency_id=int(obj['currency.id']),
+      sum=decimal.Decimal(strip_numbers(obj['sum'])),
+      start_date=datetime.datetime.strptime(
+          obj['start_date'], '%Y-%m-%d').date(),
+      end_date=(None if obj['end_date'] == '' else datetime.datetime.strptime(
+          obj['end_date'], '%Y-%m-%d').date()),
+      period_id=int(obj['period.id'])
     )
     DB.add(i)
     DB.flush()
@@ -264,8 +285,9 @@ def incomes_put(**kwargs):
     i.sum = decimal.Decimal(strip_numbers(obj['sum']))
     i.start_date = datetime.datetime.strptime(
         obj['start_date'], '%Y-%m-%d').date()
-    i.end_date = (None if obj['end_date'] == '' else datetime.datetime.strptime(
-        obj['end_date'], '%Y-%m-%d').date())
+    i.end_date = (
+            None if obj['end_date'] == '' else datetime.datetime.strptime(
+                obj['end_date'], '%Y-%m-%d').date())
     i.period_id = int(obj['period.id'])
     # except:
     #    abort(400)
@@ -275,13 +297,19 @@ def incomes_put(**kwargs):
 
 def accounts_get(**kwargs):
     if kwargs['id'] == 0:
-        return DB.query(Account).filter(Account.deleted == 'n').order_by(Account.title).all()
+        return DB.query(
+                Account).filter(
+                        Account.deleted == 'n').order_by(
+                                Account.title).all()
     return DB.query(Account).get(kwargs['id'])
 
 
 def accounts_delete(**kwargs):
     income = DB.query(Account).get(kwargs['id'])
-    if DB.query(Transaction).filter(Transaction.account_id == kwargs['id']).count() > 0:
+    _count = DB.query(
+            Transaction).filter(
+                    Transaction.account_id == kwargs['id']).count()
+    if _count > 0:
         income.deleted = 'y'
         income.show = 'n'
     else:
@@ -293,7 +321,9 @@ def accounts_delete(**kwargs):
 def accounts_post(**kwargs):
     """ add new account and set first transaction with rests of money """
     obj = json.loads(request.data.decode('utf-8', 'strict'))
-    new_account = Account(title=obj['title'], currency_id=int(obj['currency.id']))
+    new_account = Account(
+            title=obj['title'],
+            currency_id=int(obj['currency.id']))
     DB.add(new_account)
     DB.flush()
     if float(strip_numbers(obj['sum'])) > 0:
@@ -353,12 +383,12 @@ def transactions_post(**kwargs):
     DB.flush()
     if 'new_account.id' in obj:
         transfer = Transaction(
-            time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
-            account_id=int(obj['new_account.id']),
-            sum=decimal.Decimal(strip_numbers(obj['new_sum'])),
-            transfer=int(obj['transfer']) if int(obj['transfer']) > 0 else None,
-            income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None,
-            comment=obj['comment']
+          time=datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date(),
+          account_id=int(obj['new_account.id']),
+          sum=decimal.Decimal(strip_numbers(obj['new_sum'])),
+          transfer=int(obj['transfer']) if int(obj['transfer']) > 0 else None,
+          comment=obj['comment'],
+          income_id=int(obj['income.id']) if int(obj['income.id']) > 0 else None
         )
         DB.add(transfer)
         DB.flush()
@@ -395,7 +425,9 @@ def balance_get(**kwargs):
     balance = {}
     incomes = DB.query(Income).filter(
         and_(Income.start_date <= kwargs['end_date'],
-             or_(Income.end_date >= kwargs['start_date'], Income.end_date == None)))
+             or_(
+                 Income.end_date >= kwargs['start_date'],
+                 Income.end_date is None)))
     for i in incomes.all():
         _sum = i.get_sum(start_date=kwargs['start_date'],
                          end_date=kwargs['end_date'],
@@ -407,7 +439,8 @@ def balance_get(**kwargs):
     total = 0
     for currency in currency_get():
         if currency['title'] in balance:
-            total += decimal.Decimal(currency['rate'] * balance[currency['title']])
+            total += decimal.Decimal(
+                    currency['rate'] * balance[currency['title']])
             balance[currency['title']] = balance[currency['title']]
     balance['TOTAL'] = int(total)
     balance['start_date'] = kwargs['start_date']
@@ -420,18 +453,26 @@ def balance_get(**kwargs):
     week_end = week_begin + datetime.timedelta(7)
     week_sum = decimal.Decimal(0)
     tmp_results = DB.query(Transaction).join(Account).join(Currency).filter(
-        and_(or_(Transaction.transfer == None, Transaction.transfer <= 0),
-             and_(or_(Transaction.income_id <= 0, Transaction.income_id == None),
-                  and_(Transaction.sum < 0,
-                       and_(Transaction.time >= week_begin, Transaction.time < week_end)
-                      )
+        and_(or_(Transaction.transfer is None, Transaction.transfer <= 0),
+             and_(or_(
+                 Transaction.income_id <= 0,
+                 Transaction.income_id is None),
+                  and_(
+                      Transaction.sum < 0,
+                      and_(
+                           Transaction.time >= week_begin,
+                           Transaction.time < week_end
+                           )
+                       )
                  )
-            )).all()
+             )).all()
 
     for k in tmp_results:
         week_sum += k.sum * k.account.currency.get_rate().rate
 
-    balance['weekly'] = "{}/{}".format(int(-1*week_sum), balance['TOTAL'] // balance['weeks'])
+    balance['weekly'] = "{}/{}".format(
+            int(-1*week_sum),
+            balance['TOTAL'] // balance['weeks'])
     return balance
 
 
@@ -442,7 +483,13 @@ def backlogs_get(**kwargs):
         + datetime.timedelta(14)
     if kwargs['id'] > 0:
         return incomes_get(id=kwargs['id'], end_date=week_ahead).get_backlog()
-    for i in list(map(lambda x: x.get_backlog(), incomes_get(id=0, end_date=week_ahead))):
+    _list = list(
+            map(
+                lambda x: x.get_backlog(),
+                incomes_get(
+                    id=0,
+                    end_date=week_ahead)))
+    for i in _list:
         for k in i:
             results.append(k)
     return sorted(results, key=lambda x: x['time'], reverse=True)
@@ -468,7 +515,8 @@ def backlogs_put(**kwargs):
     actually insert transaction
     """
     obj = json.loads(request.data.decode('utf-8', 'strict'))
-    origin_time = datetime.datetime.strptime(obj['origin_time'], '%Y-%m-%d').date()
+    origin_time = datetime.datetime.strptime(
+            obj['origin_time'], '%Y-%m-%d').date()
     operation_time = datetime.datetime.strptime(obj['time'], '%Y-%m-%d').date()
 
     transaction = Transaction(
@@ -515,7 +563,7 @@ def plan_get(**kwargs):
                 "currencies": currency_get(),
                 "incomes": incomes_get()
             }
-           }
+            }
 
 
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
@@ -532,7 +580,9 @@ def plan_get(**kwargs):
                    datetime.date.today().isoweekday() % 7)
            },
            methods=['GET'])
-@app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
+@app.route(
+        '/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>',
+        methods=['GET'])
 def dispatcher(**kwargs):
     """ main dispatcher """
     access_token = session.get('access_token')
@@ -563,7 +613,9 @@ def dispatcher(**kwargs):
         str(request.method).lower())](**kwargs), default=json_serial)
 
 
-@app.route('/img/<string:plot>/<string:start_date>/<string:end_date>', methods=['GET'])
+@app.route(
+        '/img/<string:plot>/<string:start_date>/<string:end_date>',
+        methods=['GET'])
 def plot_graph(**kwargs):
     """
     docstring here

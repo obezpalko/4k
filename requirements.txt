@@ -12,7 +12,7 @@ flask_oauth
 URLEncoder
 sqlalchemy
 matplotlib
-uwsgi
+# uwsgi
 certifi
 urllib3
 flask_sqlalchemy

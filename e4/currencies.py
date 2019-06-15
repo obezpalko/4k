@@ -11,7 +11,8 @@ from sqlalchemy import Column, DateTime, Integer, ForeignKey, Numeric, \
     String, CHAR, PrimaryKeyConstraint, Boolean, \
     and_, select, func
 from flask import request, session
-from .base import __base__, DB_SESSION as DB
+from base import __base__, DB_SESSION as DB
+
 
 class Rate(__base__):  # pylint: disable=R0903
     """
@@ -37,6 +38,7 @@ class Rate(__base__):  # pylint: disable=R0903
         return "{}={:.4f}*{}".format(
             self.currency_b, self.rate, self.currency_a
         )
+
     @property
     def json(self):  # pylint: disable=C0111
         """convert object to dict/json"""
@@ -47,6 +49,7 @@ class Rate(__base__):  # pylint: disable=R0903
             "rate": self.rate,
             "rate_date": self.rate_date.date().isoformat()
         }
+
 
 class Currency(__base__):
     """

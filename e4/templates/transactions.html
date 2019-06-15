@@ -1,27 +1,94 @@
 {% extends "layout.html" %} {% if session.user %} {% block js %}
 <script>
+    /*global
+                                                                                                        jsonApiCall
+
+                                                                                                        */
+
+    /*eslint no-console: 0*/
+    function getFormData() {
+        return {
+            title: $("#transactions [name='title']").val(),
+            time: $("#transactions [name='date']").val(),
+            "account.id": $("#transactions [name='account_id']").val(),
+            transfer: $("#transactions [name='transfer']").val(),
+            "income.id": $("#transactions [name='income_id']").val(),
+            comments: $("#transactions [name='comments']").val(),
+            summ: $("#transactions [name='summ']").val()
+        };
+    }
+    $(function() {
+
+        $(".transaction_edit").click(function() {
+            var transactionid = $(this).attr("href").substring(1);
+            var buttons = [{
+                text: "Insert",
+                click() {
+                    console.log(getFormData());
+                    jsonApiCall("PUT", "/api/transaction", getFormData(), $("#transactions"));
+                }
+            }];
+            if (transactionid !== "0") {
+                buttons = [{
+                    text: "Change",
+                    click() {
+                        jsonApiCall("POST", "/api/transaction/" + transactionid, getFormData(), $("#transactions"));
+                    }
+                }, {
+                    text: "Delete",
+                    click() {
+                        jsonApiCall("DELETE", "/api/transaction/" + transactionid, {
+                            delete: transactionid
+                        }, $("#transactions"));
+                    }
+                }];
+            }
+
+            jsonApiCall("GET", "/api/transaction/" + transactionid, null, $("transactions"),
+                function(data) {
+                    console.log(data.time);
+                    $("#transactions [name='id']").val(data.id);
+                    /*
+                    $("#transactions [name='title']").val(data.title);
+                    $("#transactions [name='currency.id']").val(data.currency.id);
+                    $("#transactions [name='period']").val(data.period.id);
+                    $("#transactions [name='start_date']").val(data.start_date);
+                    */
+                    $("#transactions [name='date']").val(data.time);
+                    $("#transactions [name='summ']").val(data.summ);
+                    $("#transactions").dialog({
+                        buttons
+                    }).focus();
+                },
+                function() {}
+            );
+        });
+    });
 </script>
 {% endblock %} {% endif %} {% block body %} {% if session.user %}
 
-<form action="{{ url_for('main_dispatcher', api='transaction') }}" method=post class="add-entry hidden" id="accounts">
+<form action="{{ url_for('main_dispatcher', api='transaction') }}" method=post class="add-entry hidden" id="transactions">
     <dl>
         <dt>ID</dt>
         <dd><input type=text name=id class=id value="" size=4 disabled></dd>
-        <dt>Title</dt>
-        <dd><input type=text size=25 name=title class=form_save value=""></dd>
-        <dt>Currency</dt>
-        <dd><select name=currency.id class="currency currency_selector currency_picker"></select></dd>
-        <dt>Visible</dt>
-        <dd><input type="checkbox" name=visible class=form_save>
-        </dd>
+        <dt>date</dt>
+        <dd><input name="date" class="date datepicker" size="11" autocomplete="off"></dd>
+        <dt>Account ID</dt>
+        <dd><input type=text size=25 name=account_id class=form_save value=""></dd>
         <dt>Summ</dt>
-        <dd><input name=balance class=form_save size=10></dd>
+        <dd><input name=summ class=form_save size=10></dd>
+        <dt>Transfer</dt>
+        <dd><input name=transfer class=form_save size=10></dd>
+        <dt>income ID</dt>
+        <dd><input name=income_id class=form_save size=10></dd>
+        <dt>Comments</dt>
+        <dd><input name=comments class=form_save size=10></dd>
     </dl>
 </form>
 
 <table>
     <tr>
-        <th>id <a href='#0' class="account_edit">+</a></th>
+        <th>id <a href='#0' class="transaction_edit">+</a></th>
         <th>time</th>
         <th colspan=2>summ</th>
         <th>account</th>
@@ -33,7 +100,7 @@
     {% for transaction in transactions %}
     <tr>
         <td>
-            {{ transaction.record_id }}
+            <a href="#{{ transaction.record_id }}" class="transaction_edit">{{ transaction.record_id }}</a>
         </td>
         <td>
             {{ transaction.time }}

@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "${workspaceRoot}/e4-dev/bin/python"
+"python.venvPath": "~/.local/share/virtualenvs/",
+"python.pythonPath": "~/.local/share/virtualenvs/4k-ByyqB_1b/bin/python"
 }

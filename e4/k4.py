@@ -3,6 +3,7 @@ main programm.
 """
 
 import json
+import click
 from decimal import Decimal
 from datetime import date, datetime
 from flask import Flask, request, url_for, redirect, session, \
@@ -18,7 +19,7 @@ from .currencies import UserCurrencies, Currency
 from .currencies import usercurrency_delete, usercurrency_put, currency_get  # pylint: disable=W0611
 from .base import DB_URL, DB_SESSION
 from .utils import strip_numbers
-from .transactions import Transaction, transaction_get  # pylint: disable=W0611
+from .transactions import Transaction, transaction_get, transaction_put, transaction_post, transaction_delete  # pylint: disable=W0611
 #  from .payforward import Payforward
 
 __version__ = "1.0.1"
@@ -122,7 +123,6 @@ def incomes():
         active_accounts=active_accounts_get()
     )
 
-
 def active_accounts_get(**kwargs): # pylint: disable=C0111,W0613
     return DB.query(Account).filter(
         and_(
@@ -168,7 +168,7 @@ def currency():
 
 
 @APP.route('/transactions')
-def transaction():
+def transactions():
     '''show transactions log'''
     if 'user' not in session:
         return redirect(url_for('index'))
@@ -346,6 +346,56 @@ def period_get(**kwargs):
             ).first()
     return DB.query(Interval).all()
 
+@APP.cli.command()
+def sync_transactions():
+    ''' sync transactions from prev db '''
+    click.echo('Init the db')
+    from .base import OLD_DB_URL
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import scoped_session, sessionmaker
+    __old_engine__ = create_engine(OLD_DB_URL)
+    old_db_session = scoped_session(
+        sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=__old_engine__))
+    old_db = flask_scoped_session(old_db_session, APP)
+    result = old_db.execute("select * from transactions")
+    results = {}
+    for row in result:
+        results[row['id']] = row
+        _transaction = DB.query(Transaction).get(row['id'])
+        if _transaction is None:
+            # if row['transfer']:
+            #     print('transfer. skipping for now')
+            #     continue
+            print("adding {}".format(row['id'], row))
+            new_transaction = Transaction(record_id=row['id'], time=row['time'],
+                                          account_id=row['account_id'], user_id=1, summ=row['sum'],
+                                          income_id=row['income_id'], comments=row['comment'])
+            print(new_transaction)
+            DB.add(new_transaction)
+            continue
+        if _transaction.summ == row['sum'] and _transaction.account_id == row['account_id'] and _transaction.transfer == row['transfer'] and _transaction.income_id == row['income_id'] and _transaction.comments == row['comment']:
+            continue
+        #print("{:3d} {:7.2f} {:3d} {:3d} {:3d} {:30s}".format(
+        #    row['id'], row['sum'], row['account_id'], row['transfer'], row['income_id'], row['comment']
+        #    ))
+
+        print(row)
+        print(_transaction)
+        # \n    {:7s} {:3s} {:3s}
+        # _transaction.summ,  _transaction.account_id, _transaction.transfer
+    DB.commit()
+    for _transaction in DB.query(Transaction).all():
+        if _transaction.record_id in results:
+            continue
+        print(_transaction)
+    old_db.close()
+
+    #print(results)
+
+
 @APP.route(
     '/api/<string:api>',
     defaults={'id': 0},
@@ -357,7 +407,9 @@ def main_dispatcher(**kwargs):
     """ main dispatcher """
     if 'user' not in session:
         return '{"access": "denied"}'
-    kwargs['args'] = request.args
+    # kwargs['user_id'] = session['user'][0]
+    # kwargs['args'] = request.args
+    # print("KW: {}".format(kwargs))
     return Response(
         response=json.dumps(
             globals()["{}_{}".format(

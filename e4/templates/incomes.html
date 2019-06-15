@@ -27,7 +27,7 @@
 <table>
     <tr>
         <th>income <a href='#0' class="income_edit">+</a></th>
-        <th>summ</th>
+        <th colspan=2>summ</th>
         <th>period</th>
         <th>from</th>
         <th>to</th>
@@ -40,7 +40,8 @@
         <td>
             <a href='#{{ income.record_id }}' class="income_edit">{{ income.title }}</a>
         </td>
-        <td>{{ income.summ }} <span class="currency_id hidden">{{ income.currency_id }}</span>{{ income.currency.symbol }}</td>
+        <td style="text-align: right; font-family: fixed">{{ income.summ }}</td>
+        <td> <span class="currency_id hidden">{{ income.currency_id }}</span>{{ income.currency.symbol }}</td>
         <td>{{income.period.title}}</td>
         <td>{{ income.start_date if income.start_date else "" }}</td>
         <td>{{income.end_date if income.end_date else ""}}</td>

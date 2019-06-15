@@ -54,4 +54,5 @@ def number_of_weeks(date1, date2):
 
 def strip_numbers(number):
     """ replace accidentally entered instead decimal dot chars """
-    return number.replace('ю', '.').replace('ץ', '.').replace(',', '.').replace(' ', '')
+    return number.replace(
+            'ю', '.').replace('ץ', '.').replace(',', '.').replace(' ', '')

@@ -4,7 +4,8 @@ payforward object
 
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Date, Integer, ForeignKey
-from .base import __base__
+from base import __base__
+
 
 class Payforward(__base__):  # pylint: disable=R0903
     """table of regular payments which was payed before described date.

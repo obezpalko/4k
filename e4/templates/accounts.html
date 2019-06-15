@@ -21,7 +21,7 @@
 <table>
     <tr>
         <th>account <a href='#0' class="account_edit">+</a></th>
-        <th>balance</th>
+        <th colspan=2>balance</th>
         <th>visible</th>
 
     </tr>
@@ -30,7 +30,8 @@
         <td>
             <a href='#{{ account.record_id }}' class="account_edit">{{ account.title }}</a>
         </td>
-        <td>{{ account.balance() }} <span class="currency_id hidden">{{ account.currency_id }}</span>{{ account.currency.symbol }}</td>
+        <td style="text-align: right; font-family: fixed">{{ account.balance() }}</td>
+        <td><span class="currency_id hidden">{{ account.currency_id }}</span>{{ account.currency.symbol }}</td>
         <td><input type="checkbox" class="account_visible" value="{{ account.record_id }}" {% if account.visible %}checked{% endif %}></td>
     </tr>
     {% endfor %}

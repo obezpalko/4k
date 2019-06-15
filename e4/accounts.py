@@ -9,8 +9,7 @@ from sqlalchemy.orm import relationship
 
 from sqlalchemy import Column, Integer, ForeignKey, \
     String, Boolean, func, and_
-from .base import __base__, DB_SESSION as DB
-
+from base import __base__, DB_SESSION as DB
 
 
 class Account(__base__):
@@ -41,7 +40,7 @@ class Account(__base__):
         }
 
     def fix_balance(self, n_balance, n_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):   # pylint: disable=C0111
-        from .transactions import Transaction
+        from .transactions import Transaction  # pylint: disable=cyclic-import
         delta = n_balance - self.balance(n_date)
         if delta == 0:
             return 0
@@ -55,7 +54,7 @@ class Account(__base__):
 
 
     def balance(self, end_date=datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)):   # pylint: disable=C0111
-        from .transactions import Transaction
+        from .transactions import Transaction  # pylint: disable=cyclic-import
         result = DB.query(
             Transaction.account_id,
             func.sum(Transaction.summ).label('total')
