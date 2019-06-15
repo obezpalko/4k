@@ -1,13 +1,13 @@
 [Unit]
 Description=4 Envelopes uWSGI
 After=syslog.target
+Requires=postgresql.service
 
 [Service]
 WorkingDirectory=/home/obezpalko/src/4k
 ExecStart=/home/obezpalko/src/4k/4k-37/bin/uwsgi --ini /home/obezpalko/src/4k/uwsgi.ini
-# PIDFile=/var/run/uwsgi/e4.pid
 ExecReload=/bin/kill -HUP $MAINPID
-# Requires systemd version 211 or newer
+EnvironmentFile=/home/obezpalko/src/4k/e4.env
 RuntimeDirectory=uwsgi
 Restart=always
 KillSignal=SIGTERM

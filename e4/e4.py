@@ -22,17 +22,18 @@ from .database import DB, DB_URL, Currency, Rate, Income, Interval, Transaction,
 #     Account, Payforward
 #  from .plot import plot_weekly_plan
 
-__version__ = "0.4"
+__version__ = "0.4.1"
 
 RE_C_EXCHANGE = re.compile(
-    r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) = <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
+    r'<div id=currency_converter_result>1 (?P<currency_b>[A-Z]{3}) ='
+    ' <span class=bld>(?P<rate>[0-9.]*) (?P<currency_a>[A-Z]{3})</span>')
 
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
 
-GOOGLE_CLIENT_ID = '571919489560-p5itd3kcf1ileur7ih5bn07kc51ur21p.apps.googleusercontent.com'
-GOOGLE_CLIENT_SECRET = 'ji3-Qsfziyj6ya0IdXUd6sGT'
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', default=False)
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', default=False)
 REDIRECT_URI = '/oauth2callback'  # one of the Redirect URIs from Google APIs console
 
 oauth = OAuth()
@@ -54,9 +55,9 @@ google = oauth.remote_app(
 # Load default config and override config from an environment variable
 app.config.update(dict(
     DATABASE=os.path.join(app.root_path, 'e4.db'),
-    SECRET_KEY='icDauKnydnomWovijOakgewvIgyivfahudWocnelkikAndeezCogneftyeljogdy',
-    USERNAME='admin',
-    PASSWORD='NieniarcEgHiacHeulijkikej',
+    SECRET_KEY=os.environ.get('APP_SECRET_KEY', default=False),
+    USERNAME=os.environ.get('APP_USERNAME', default=False),
+    PASSWORD=os.environ.get('APP_PASSWORD', default=False),
     HORIZON='12m',
     PREFERRED_URL_SCHEME='https',
     SESSION_TYPE = 'sqlalchemy',
@@ -201,23 +202,23 @@ def currency_get(**kwargs):
     get list of currency rates
     '''
     max_date_q = select([
-            Rate.currency_b_id.label("b_id"),
-            func.max(Rate.rate_date).label("rate_date")
-    ]).group_by( Rate.currency_b_id ).alias('max_date_q')
+        Rate.currency_b_id.label("b_id"),
+        func.max(Rate.rate_date).label("rate_date")
+    ]).group_by(Rate.currency_b_id ).alias('max_date_q')
     rates_query = DB.query(
         Rate.currency_b_id, Rate, Rate.rate_date
     ).join(
         max_date_q,
         and_(
-            max_date_q.c.b_id==Rate.currency_b_id,
-            max_date_q.c.rate_date==Rate.rate_date
+            max_date_q.c.b_id == Rate.currency_b_id,
+            max_date_q.c.rate_date == Rate.rate_date
         )
     )
 
     entries = []
     if 'id' in kwargs and kwargs['id']:
         try:
-            return rates_query.filter(Rate.currency_b_id==kwargs['id']).first()[1].to_dict()
+            return rates_query.filter(Rate.currency_b_id == kwargs['id']).first()[1].to_dict()
         except TypeError:
             return []
     else:
