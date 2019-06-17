@@ -107,3 +107,4 @@ e4/.sql
 4k-37/
 e4-dev/
 /e4.env
+.gitsecret/keys/random_seed
