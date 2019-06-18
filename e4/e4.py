@@ -8,11 +8,13 @@ import re
 import datetime
 import decimal
 from flask import Flask, request, session, redirect, url_for, \
-    render_template, flash, send_file
+    render_template, flash, send_file, make_response
+from functools import wraps
+from flask_dance.contrib.google import make_google_blueprint, google
 
 #  from flask_login import UserMixin, login_required, login_user, logout_user, current_user
-from flask_oauth import OAuth
-from flask_sqlalchemy import SQLAlchemy
+# from flask_oauth import OAuth
+# from flask_sqlalchemy import SQLAlchemy
 from urllib3 import PoolManager
 import certifi
 from sqlalchemy import func, and_, or_, desc, select
@@ -31,25 +33,27 @@ RE_C_EXCHANGE = re.compile(
 
 app = Flask(__name__)  # create the application instance :)
 app.config.from_object(__name__)  # load config from this file , flaskr.py
+app.debug = True
 
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', default=False)
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', default=False)
-REDIRECT_URI = '/oauth2callback'  # one of the Redirect URIs from Google APIs console
+# REDIRECT_URI = '/oauth2callback'  # one of the Redirect URIs from Google APIs console
 
-oauth = OAuth()
+# oauth = OAuth()
 
-google = oauth.remote_app(
-    'google',
-    base_url='https://www.google.com/accounts/',
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    request_token_url=None,
-    request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
-                          'response_type': 'code'},
-    access_token_url='https://accounts.google.com/o/oauth2/token',
-    access_token_method='POST',
-    access_token_params={'grant_type': 'authorization_code'},
-    consumer_key=GOOGLE_CLIENT_ID,
-    consumer_secret=GOOGLE_CLIENT_SECRET)
+# google = oauth.remote_app(
+#     'google',
+#     base_url='https://www.google.com/accounts/',
+#     authorize_url='https://accounts.google.com/o/oauth2/auth',
+#     request_token_url=None,
+#     request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
+#                           'response_type': 'code'},
+#     access_token_url='https://accounts.google.com/o/oauth2/token',
+#     access_token_method='POST',
+#     access_token_params={'grant_type': 'authorization_code'},
+#     consumer_key=GOOGLE_CLIENT_ID,
+#     consumer_secret=GOOGLE_CLIENT_SECRET)
+
 
 #
 # Load default config and override config from an environment variable
@@ -60,12 +64,23 @@ app.config.update(dict(
     PASSWORD=os.environ.get('APP_PASSWORD', default=False),
     HORIZON='12m',
     PREFERRED_URL_SCHEME='https',
-    SESSION_TYPE = 'sqlalchemy',
-    SQLALCHEMY_DATABASE_URI = DB_URL,
-    SQLALCHEMY_TRACK_MODIFICATIONS = False,
+    SESSION_TYPE='sqlalchemy',
+    SQLALCHEMY_DATABASE_URI=DB_URL,
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
     DEBUG=True
 ))
 app.config.from_envvar('E4_SETTINGS', silent=True)
+blueprint = None
+blueprint = make_google_blueprint(
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    scope=[
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email"
+        ]
+)
+app.register_blueprint(blueprint, url_prefix="/login")
 
 
 def json_serial(obj):
@@ -80,6 +95,28 @@ def json_serial(obj):
     raise TypeError("Type {} not serializable ({})".format(type(obj), obj))
 
 
+class IsAuthorized(object):
+    """ decorator """
+    def __init__(self, f):
+        self.f = f
+    def __call__(self, *args, **kwargs):
+        self.f(*args, **kwargs)
+
+
+def is_authorized(a_func):
+    @wraps(a_func)
+    def wrapTheFunc(*args, **kwargs):
+        if not google.authorized:
+            return redirect(url_for("google.login"))
+        if not session.get('logged_in', False):
+            resp = google.get("/oauth2/v1/userinfo")
+            assert resp.ok, resp.text
+            if not (resp.json()['email'] in ['alex@bezpalko.mobi', 'obezpalko@gmail.com']):
+                return redirect(url_for('google.login'))
+            session['email'] = resp.json()['email']
+            session['logged_in'] = True
+        return a_func(*args, **kwargs)
+    return wrapTheFunc
 
 @app.teardown_request
 def session_clear(exception=None):
@@ -132,30 +169,13 @@ def update_rates():
     except (RuntimeError, AttributeError):
         return True
 
-
 @app.route('/')
 @app.route('/incomes')
+@is_authorized
 def show_incomes():
     """
     docstring here
     """
-    access_token = session.get('access_token')
-    if access_token is None:
-        return redirect(url_for('login'))
-    access_token = access_token[0]
-    _http = PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
-    headers = {'Authorization': 'OAuth '+access_token}
-    _request = _http.request('GET', 'https://www.googleapis.com/oauth2/v1/userinfo', None, headers)
-    if _request.status == 401:
-        session.pop('access_token', None)
-        return redirect(url_for('login'))
-    userinfo = json.loads(_request.data.decode('utf-8', 'strict'))
-    if not (userinfo['email'] in ['alex@bezpalko.mobi', 'obezpalko@gmail.com']):
-        session.pop('access_token', None)
-        return redirect(url_for('login'))
-    else:
-        session['email'] = userinfo['email']
-        session['logged_in'] = True
 
     return render_template('show_entries.html',
                            entries=list(map(lambda x: x.to_dict(), incomes_get(id=0))),
@@ -164,35 +184,22 @@ def show_incomes():
                            transactions=list(map(lambda x: x.to_dict(), transactions_get(id=0))))
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    callback = url_for('authorized', _external=True)
-    return google.authorize(callback=callback)
 
-
-@app.route(REDIRECT_URI)
-@google.authorized_handler
-def authorized(resp):
-    access_token = resp['access_token']
-    session['access_token'] = access_token, ''
-    return redirect(url_for('show_incomes'))
-
-
-@google.tokengetter
+# @google.tokengetter
 def get_access_token():
+    app.logger.info('token getter')
     return session.get('access_token')
 
 
 @app.route('/logout')
 def logout():
-
-    session.pop('logged_in', None)
-    session.pop('access_token', None)
-    session.pop('email', '')
-    flash('You were logged out')
-    return redirect(url_for('show_incomes', _external=True, _scheme='https'))
+    app.logger.info('logout')
+    resp = make_response(redirect(url_for('show_incomes', _external=True, _scheme='https')))
+    resp.set_cookie('session', '', max_age=0)
+    return resp
 
 
+@app.cli.command('version')
 def version_get():
     return {'version': __version__}
 
@@ -522,6 +529,7 @@ def plan_get(**kwargs):
            }
 
 
+
 @app.route('/api', defaults={'api': 'balance'}, methods=['GET'])
 @app.route('/api/<string:api>', defaults={'id': 0}, methods=['GET', 'POST'])
 @app.route('/api/<string:api>/<int:id>',
@@ -537,11 +545,9 @@ def plan_get(**kwargs):
            },
            methods=['GET'])
 @app.route('/api/<string:api>/<int:id>/<string:start_date>/<string:end_date>', methods=['GET'])
+@is_authorized
 def dispatcher(**kwargs):
     """ main dispatcher """
-    access_token = session.get('access_token')
-    if access_token is None:
-        return '{"access": "denied"}'
 
     if 'start_date' in kwargs and isinstance(kwargs['start_date'], datetime.date):
         start_date = kwargs['start_date']

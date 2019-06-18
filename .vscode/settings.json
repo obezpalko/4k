@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "${workspaceRoot}/4k/bin/python",
+    "python.pythonPath": "4k-37/bin/python3.7",
     "files.exclude": {
         "**/.git": true,
         "**/.svn": true,
