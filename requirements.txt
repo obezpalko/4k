@@ -1,4 +1,5 @@
 chardet
+pipenv
 psycopg2
 requests
 flask
