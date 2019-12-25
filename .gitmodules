@@ -1,3 +1,0 @@
-[submodule "python-github-webhooks"]
-	path = python-github-webhooks
-	url = git@github.com:obezpalko/python-github-webhooks.git

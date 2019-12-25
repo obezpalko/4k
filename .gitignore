@@ -99,9 +99,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
 *.yml
 *.csv
 e4/*.db
 e4/.sql
-4k/
-e4-dev/
+
