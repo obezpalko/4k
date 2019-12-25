@@ -343,7 +343,13 @@ def transactions_get(**kwargs):
     """ load intervals from database """
     if kwargs['id'] == 0:
         return DB.query(Transaction).order_by(
-            desc(Transaction.time)).limit(100).from_self().order_by(
+            #  desc(Transaction.time)).limit(100).from_self().order_by(
+            desc(Transaction.time)).filter(
+                Transaction.time>=((
+                    datetime.date.today().replace(day=1) -
+                    datetime.timedelta(1)
+                ).replace(day=1) - datetime.timedelta(1)).replace(day=1)
+            ).from_self().order_by(
                 Transaction.time).all()
     return DB.query(Transaction).order_by(
         desc(Transaction.time)).get(kwargs['id'])
