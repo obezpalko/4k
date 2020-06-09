@@ -1,21 +1,22 @@
+certifi
 chardet
-pipenv
-psycopg2
-requests
 flask
 flask_login
 flask_oauth
+flask_oauth
+flask_session
+flask_sqlalchemy
+flask_sqlalchemy_session
 google-api-python-client
 google-auth
-google-auth-oauthlib
 google-auth-httplib2
-flask_oauth
-URLEncoder
-sqlalchemy
+google-auth-oauthlib
+httplib2>=0.18.0
 matplotlib
-# uwsgi
-certifi
+pipenv
+psycopg2
+requests
+sqlalchemy
+URLEncoder
 urllib3
-flask_sqlalchemy
-flask_session
-flask_sqlalchemy_session
+# uwsgi
