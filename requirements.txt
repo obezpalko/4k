@@ -12,10 +12,12 @@ google-auth
 google-auth-httplib2
 google-auth-oauthlib
 httplib2>=0.19.0
+jinja2>=2.11.3
 matplotlib
 pipenv
 psycopg2
 requests
+rsa>=4.1
 sqlalchemy
 URLEncoder
 urllib3
