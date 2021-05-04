@@ -17,8 +17,8 @@ matplotlib
 pipenv
 psycopg2
 requests
-rsa>=4.1
+rsa>=4.7
 sqlalchemy
 URLEncoder
-urllib3
+urllib3>=1.25.8
 # uwsgi
