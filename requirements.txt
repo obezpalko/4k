@@ -3,7 +3,6 @@ chardet
 flask
 flask_login
 flask_oauth
-flask_oauth
 flask_session
 flask_sqlalchemy
 flask_sqlalchemy_session
